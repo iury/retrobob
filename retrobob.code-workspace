@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "path": "packages/ui",
+    },
+    {
+      "path": "packages/engine",
+    },
+  ],
+  "settings": {
+    "npm.packageManager": "pnpm",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+    },
+  },
+}

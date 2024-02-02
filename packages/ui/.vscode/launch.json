@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Launch Chrome",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}",
+      "skipFiles": ["${workspaceFolder}/node_modules/**/*.js"],
+      "preLaunchTask": "npm: dev"
+    }
+  ]
+}
