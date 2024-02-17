@@ -1,21 +1,19 @@
 {
   "name": "engine",
   "private": true,
-  "version": "0.0.1",
-  "type": "module",
-  "main": "src/index.js",
-  "exports": {
-    "./famibob": "./src/cores/famibob/index.js"
-  },
+  "version": "0.3.0",
+  "main": "build/retrobob.js",
   "scripts": {
-    "lint": "eslint src --ext js --report-unused-disable-directives --max-warnings 0",
-    "test": "vitest"
+    "prepare": "npm run build",
+    "dev": "chokidar \"src/**/*.zig\" -c \"npm run test\"",
+    "clean": "rimraf build && rimraf zig-cache",
+    "build": "cross-env-shell zig build -p build --prefix-lib-dir . -Dtarget=wasm32-emscripten --sysroot \"$EMSDK\\upstream\\emscripten\" -Doptimize=ReleaseFast && emcc -O3 -sASSERTIONS=1 -L build -lretrobob -lblip_buf -lraylib -lidbfs.js -o build/retrobob.js -sEXPORTED_FUNCTIONS=FS,IDBFS,_malloc,_free,_main,_terminate,_setNotifyEventFn,_performAction,_getAudioBuffer -sEXPORTED_RUNTIME_METHODS=addFunction -sUSE_GLFW=3 -sMODULARIZE -sEXPORT_ES6 -sUSE_ES6_IMPORT_META -sALLOW_TABLE_GROWTH -sUSE_OFFSET_CONVERTER",
+    "build-exe": "zig build -p build --prefix-exe-dir .",
+    "test": "zig build test --summary all"
   },
   "devDependencies": {
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.1.3",
-    "vitest": "^1.2.2",
-    "crc": "^4.3.2"
+    "chokidar-cli": "^3.0.0",
+    "cross-env": "^7.0.3",
+    "rimraf": "^5.0.5"
   }
 }

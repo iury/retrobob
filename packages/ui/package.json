@@ -1,28 +1,26 @@
 {
   "name": "retrobob",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
-    "test": "vitest"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@mantine/core": "^7.5.1",
-    "@mantine/hooks": "^7.5.1",
-    "@mantine/notifications": "^7.5.1",
+    "@mantine/core": "^7.5.3",
+    "@mantine/hooks": "^7.5.3",
+    "@mantine/notifications": "^7.5.3",
+    "@tabler/icons-react": "^2.47.0",
     "engine": "workspace:*",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-dropzone": "^14.2.3",
-    "react-hotkeys-hook": "^4.5.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.51",
-    "@types/react-dom": "^18.2.18",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react-swc": "^3.6.0",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
@@ -30,8 +28,7 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "vite": "^5.0.12",
-    "vite-plugin-pwa": "^0.17.5",
-    "vitest": "^1.2.2"
+    "vite": "^5.1.3",
+    "vite-plugin-pwa": "^0.18.2"
   }
 }

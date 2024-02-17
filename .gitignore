@@ -1,4 +1,7 @@
 roms
+build
+zig-cache
+zig-out
 
 # Logs
 logs

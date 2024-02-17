@@ -8,7 +8,7 @@
       "url": "http://localhost:5173",
       "webRoot": "${workspaceFolder}",
       "skipFiles": ["${workspaceFolder}/node_modules/**/*.js"],
-      "preLaunchTask": "npm: dev"
+      "preLaunchTask": "npm dev (ui)"
     }
   ]
 }

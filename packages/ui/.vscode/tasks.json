@@ -4,7 +4,7 @@
     {
       "type": "npm",
       "script": "dev",
-      "label": "npm: dev",
+      "label": "npm dev (ui)",
       "detail": "vite",
       "isBackground": true,
       "problemMatcher": [
@@ -24,8 +24,7 @@
     {
       "type": "npm",
       "script": "build",
-      "label": "npm: build",
-      "detail": "vite build",
+      "label": "npm build (ui)",
       "problemMatcher": [],
       "group": {
         "kind": "build",
