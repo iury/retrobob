@@ -4,8 +4,9 @@ const c = @import("c.zig");
 
 const Core = @import("cores/core.zig");
 const Famibob = @import("cores/famibob/famibob.zig").Famibob;
+const Gamebob = @import("cores/gamebob/gamebob.zig").Gamebob;
 
-pub const ActiveCore = enum(u8) { unknown = 0, famibob = 1 };
+pub const ActiveCore = enum(u8) { unknown = 0, famibob = 1, gamebob = 2 };
 const Ratio = enum(u8) { native = 1, ntsc = 2, pal = 3, standard = 4, widescreen = 5 };
 
 const Action = enum(i32) {
@@ -29,8 +30,6 @@ var core: ?Core = null;
 var active_core: ActiveCore = .unknown;
 var slot: u8 = 1;
 
-var texture: ?c.RenderTexture2D = null;
-var framebuf: ?[]u32 = null;
 var audio_stream: ?c.AudioStream = null;
 var audio_buffer: [3840]f32 = [_]f32{0} ** 3840;
 
@@ -60,8 +59,6 @@ fn loadROM(data: []const u8) bool {
             };
 
             core = famibob.core();
-            texture = c.LoadRenderTexture(@intFromFloat(core.?.game_width), @intFromFloat(core.?.game_height));
-            framebuf = &famibob.ppu.framebuf;
             resizeScreen();
 
             audio_stream = c.LoadAudioStream(48000, 32, 2);
@@ -80,6 +77,38 @@ fn loadROM(data: []const u8) bool {
             }
             return true;
         },
+        .gamebob => {
+            var gamebob = Gamebob.init(std.heap.c_allocator, data) catch |err| {
+                switch (err) {
+                    error.UnsupportedMapper => {
+                        std.debug.print("notify: Unsupported mapper\n", .{});
+                    },
+                    else => {},
+                }
+                return false;
+            };
+
+            core = gamebob.core();
+            resizeScreen();
+
+            c.SetAudioStreamBufferSizeDefault(800);
+            audio_stream = c.LoadAudioStream(48000, 32, 2);
+            c.PlayAudioStream(audio_stream.?);
+
+            setFPS(60);
+            c.notifyEvent(.region_support, 0);
+            performAction(.change_ratio, @intFromEnum(Ratio.native), 0);
+            c.notifyEvent(.has_battery, if (gamebob.cartridge.battery) 1 else 0);
+
+            if (gamebob.cartridge.battery) {
+                const _slot = slot;
+                slot = 0;
+                performAction(.load_state, 0, null);
+                slot = _slot;
+                performAction(.reset_game, 0, null);
+            }
+            return true;
+        },
         else => return false,
     }
 }
@@ -88,11 +117,6 @@ fn unloadCore() void {
     if (audio_stream) |stream| {
         c.UnloadAudioStream(stream);
         audio_stream = null;
-    }
-
-    if (texture) |t| {
-        c.UnloadRenderTexture(t);
-        texture = null;
     }
 
     if (core) |*cr| {
@@ -286,6 +310,13 @@ fn handleFileDropped() void {
         {
             performAction(.change_region, @intFromEnum(Core.Region.pal), 0);
         }
+    } else if (std.mem.endsWith(u8, lower_path, ".gb") or std.mem.endsWith(u8, lower_path, ".gbc")) {
+        performAction(.load_core, @intFromEnum(ActiveCore.gamebob), 0);
+        const file = std.fs.openFileAbsoluteZ(files.paths[0], .{}) catch return;
+        defer file.close();
+        const buf = file.readToEndAlloc(alloc, @truncate(file.getEndPos() catch 0)) catch return;
+        defer alloc.free(buf);
+        performAction(.load_game, @truncate(buf.len), buf.ptr);
     } else {
         performAction(.unload_core, 0, null);
         std.debug.print("notify: Unsupported file\n", .{});
@@ -340,6 +371,8 @@ fn handleCmdKeys() void {
 
 fn render() void {
     if (core) |*cr| {
+        const texture = cr.getTexture();
+
         if (cr.state == .playing) {
             c.SetWindowTitle(c.TextFormat("retrobob - %d fps", c.GetFPS()));
             c.ClearBackground(c.BLACK);
@@ -353,33 +386,30 @@ fn render() void {
 
         const overscan: f32 = if (ratio == .ntsc) 8 else 0;
 
-        if (texture) |t| {
-            const applied_zoom: f32 = @as(f32, @floatFromInt(c.GetScreenHeight())) / @as(f32, @floatFromInt(t.texture.height));
-            const width: f32 = @floatFromInt(t.texture.width);
-            const height: f32 = @floatFromInt(t.texture.height);
-            var target_width: f32 = @floatFromInt(c.GetScreenWidth());
-            const screen_width: f32 = target_width;
+        const applied_zoom: f32 = @as(f32, @floatFromInt(c.GetScreenHeight())) / @as(f32, @floatFromInt(texture.height));
+        const width: f32 = @floatFromInt(texture.width);
+        const height: f32 = @floatFromInt(texture.height);
+        var target_width: f32 = @floatFromInt(c.GetScreenWidth());
+        const screen_width: f32 = target_width;
 
-            if (fullscreen) {
-                switch (ratio) {
-                    .native => target_width = width * applied_zoom,
-                    .ntsc => target_width = width * 8 / 7 * applied_zoom,
-                    .pal => target_width = width * 11 / 8 * applied_zoom,
-                    .standard => target_width = height * 4 / 3 * applied_zoom,
-                    .widescreen => target_width = height * 16 / 9 * applied_zoom,
-                }
+        if (fullscreen) {
+            switch (ratio) {
+                .native => target_width = width * applied_zoom,
+                .ntsc => target_width = width * 8 / 7 * applied_zoom,
+                .pal => target_width = width * 11 / 8 * applied_zoom,
+                .standard => target_width = height * 4 / 3 * applied_zoom,
+                .widescreen => target_width = height * 16 / 9 * applied_zoom,
             }
-
-            c.UpdateTexture(t.texture, @ptrCast(framebuf.?));
-            c.DrawTexturePro(
-                t.texture,
-                .{ .x = 0, .y = overscan, .width = @floatFromInt(t.texture.width), .height = @as(f32, @floatFromInt(t.texture.height)) - overscan * 2 },
-                .{ .x = (screen_width - target_width) / 2, .y = 0, .width = target_width, .height = @floatFromInt(c.GetScreenHeight()) },
-                .{ .x = 0, .y = 0 },
-                0.0,
-                c.WHITE,
-            );
         }
+
+        c.DrawTexturePro(
+            texture,
+            .{ .x = 0, .y = overscan, .width = @floatFromInt(texture.width), .height = @as(f32, @floatFromInt(texture.height)) - overscan * 2 },
+            .{ .x = (screen_width - target_width) / 2, .y = 0, .width = target_width, .height = @floatFromInt(c.GetScreenHeight()) },
+            .{ .x = 0, .y = 0 },
+            0.0,
+            c.WHITE,
+        );
     }
 }
 
@@ -429,9 +459,9 @@ fn updateAudioStream() void {
             if (c.IsAudioStreamPlaying(s)) {
                 const sample_size: usize = if (cr.region == .ntsc) 800 else 960;
                 if (builtin.os.tag == .emscripten) {
-                    _ = cr.fillAudioBuffer(audio_buffer[0 .. sample_size * 4], true);
+                    _ = cr.fillAudioBuffer(audio_buffer[0 .. sample_size * 4]);
                 } else {
-                    const samples = cr.fillAudioBuffer(audio_buffer[0 .. sample_size * 4], true);
+                    const samples = cr.fillAudioBuffer(audio_buffer[0 .. sample_size * 4]);
                     if (c.IsAudioStreamProcessed(s)) {
                         c.UpdateAudioStream(s, &audio_buffer, @intCast(samples));
                     }
@@ -473,8 +503,4 @@ export fn terminate() void {
         std.os.emscripten.emscripten_cancel_main_loop();
         std.os.emscripten.emscripten_force_exit(0);
     }
-}
-
-test {
-    _ = @import("cpus/6502/cpu.zig");
 }

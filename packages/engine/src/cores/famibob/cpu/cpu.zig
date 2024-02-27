@@ -1,7 +1,7 @@
 const std = @import("std");
 const opcode = @import("opcode.zig");
-const Memory = @import("../../memory.zig").Memory;
-const Proxy = @import("../../proxy.zig").Proxy;
+const Memory = @import("../../../memory.zig").Memory;
+const Proxy = @import("../../../proxy.zig").Proxy;
 const irq = @import("instructions/irq.zig").irq;
 
 pub const CPUCycle = enum { finished, addressing, read, write };

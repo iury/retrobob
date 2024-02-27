@@ -4,9 +4,9 @@ const std = @import("std");
 const CPU = @import("../cpu.zig").CPU;
 const BufferMapper = @import("../testing/BufferMapper.zig");
 const DummyDMC = @import("../testing/DummyDMC.zig");
-const Cartridge = @import("../../../cores/famibob/cartridge.zig").Cartridge;
-const MemoryBus = @import("../../../cores/famibob/memory_bus.zig").MemoryBus;
-const NROM = @import("../../../cores/famibob/mappers/nrom.zig").NROM;
+const Cartridge = @import("../../cartridge.zig").Cartridge;
+const MemoryBus = @import("../../memory_bus.zig").MemoryBus;
+const NROM = @import("../../mappers/nrom.zig").NROM;
 
 test "nestest" {
     @setEvalBranchQuota(100000);

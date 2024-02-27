@@ -1,4 +1,4 @@
-const Memory = @import("../../../memory.zig").Memory;
+const Memory = @import("../../../../memory.zig").Memory;
 
 data: [0x10000]u8 = [_]u8{0} ** 0x10000,
 

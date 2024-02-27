@@ -161,18 +161,20 @@ pub const PPU = struct {
     oam_dma: ?u16 = null,
     booting: ?u32 = 0,
 
-    framebuf: [61440]u32 = [_]u32{0} ** 61440,
+    framebuf: []u32,
 
     pub fn init(allocator: std.mem.Allocator, mapper: Memory(u16, u8)) !*PPU {
         const instance = try allocator.create(PPU);
         instance.* = .{
             .allocator = allocator,
             .mapper = mapper,
+            .framebuf = try allocator.alloc(u32, 61440),
         };
         return instance;
     }
 
     pub fn deinit(self: *PPU) void {
+        self.allocator.free(self.framebuf);
         self.allocator.destroy(self);
     }
 

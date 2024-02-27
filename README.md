@@ -2,6 +2,8 @@
 
 retrobob is a retro gaming emulator that runs directly on your browser.
 
+Don't have a ROM to test it? Try [Super Tilt Bro](https://sgadrat.itch.io/super-tilt-bro), a free game made by sgadrat.
+
 ## Links
 
 [Live demo](https://retrobob.bitzero.com.br/)
@@ -12,6 +14,7 @@ You'll need [pnpm](https://pnpm.io/installation), [zig 0.12](https://ziglang.org
 and [emscripten](https://emscripten.org/docs/getting_started/downloads.html)
 installed and active. Then, it is as simple as:
 
+    git submodule update --init --recursive
     pnpm install
     cd packages/ui
     pnpm dev
@@ -25,25 +28,38 @@ You can also run the emulator directly as a native executable, without the brows
 
 A gamepad (Xbox/PS) or keyboard:
 
-| Action          |        Key |
-| --------------- | ---------: |
-| Fullscreen      |        F11 |
-| Save state      |         F1 |
-| Load state      |         F4 |
-| Reset           |         F3 |
-| Pause / resume  |      Space |
-| D-pad           | Arrow keys |
-| Select          |          Q |
-| Start           | W or Enter |
-| _NES / Famicom_ |            |
-| B               |     Z or A |
-| A               |     X or S |
+| System                     |        Action         | Key        |
+| -------------------------- | :-------------------: | ---------- |
+| Global                     |                       |            |
+|                            |      Fullscreen       | F11        |
+|                            |      Save state       | F1         |
+|                            |      Load state       | F4         |
+|                            |         Reset         | F3         |
+|                            |    Pause / resume     | Space      |
+|                            |         D-pad         | Arrow keys |
+|                            |        Select         | Q          |
+|                            |         Start         | W or Enter |
+| _NES / Famicom / GB / GBC_ |                       |
+|                            |           B           | Z or A     |
+|                            |           A           | X or S     |
+| _Gameboy (monochrome)_     |                       |
+|                            | Toggle color palettes | T          |
 
 ## Supported Systems
 
+### GB / GBC
+
+- Only the main mappers are implemented but most commercial games should work.
+- MBC3's internal clock does not tick and will always return 00:00:00.
+- Games in monochrome will use a color palette like playing on a GBC hardware by default but you can toggle it by pressing T.
+
+#### Known Issues
+
+- Super Mario Bros. Deluxe (slowdowns and glitches)
+
 ### NES / Famicom
 
-Only the main mappers are implemented but most commercial games should work.
+- Only the main mappers are implemented but most commercial games should work.
 
 #### Known Issues
 
@@ -52,6 +68,17 @@ Only the main mappers are implemented but most commercial games should work.
 - Battletoads and BT&DD (random crashes)
 
 ## News
+
+### 2024-02-27 - GB/GBC support
+
+Support for the Gameboy and Gameboy Color was added. MBCs implemented: ROM, MBC1, MBC2, MBC3 and MBC5.
+
+[GBDev Pan Docs](https://gbdev.io/pandocs/About.html) was the main source of information.
+For the CPU, I recommend [this site](https://rgbds.gbdev.io/docs/v0.7.0/gbz80.7) and
+[this handy little table](https://gb-archive.github.io/salvage/decoding_gbz80_opcodes/Decoding%20Gamboy%20Z80%20Opcodes.html).
+
+Honestly, emulating GBC was a lot easier than the NES. Pan Docs are tremendously well documented and I was able to emulate almost
+everything in about a week or so. I strongly recommend as your first emulator if you want to try yourself.
 
 ### 2024-02-17 - Now using WebAssembly
 

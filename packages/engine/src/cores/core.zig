@@ -1,4 +1,5 @@
 const Self = @This();
+const c = @import("../c.zig");
 
 pub const State = enum { idle, playing, paused };
 pub const Region = enum(u8) { ntsc = 1, pal = 2 };
@@ -12,13 +13,14 @@ region: Region = .ntsc,
 
 pub const VTable = struct {
     render: *const fn (ctx: *anyopaque) void,
+    getTexture: *const fn (ctx: *anyopaque) c.Texture,
     resetGame: *const fn (ctx: *anyopaque) void,
     pauseGame: *const fn (ctx: *anyopaque) void,
     resumeGame: *const fn (ctx: *anyopaque) void,
     saveState: *const fn (ctx: *anyopaque, slot: u8) anyerror!void,
     loadState: *const fn (ctx: *anyopaque, slot: u8) anyerror!bool,
     changeRegion: *const fn (ctx: *anyopaque, region: Region) void,
-    fillAudioBuffer: *const fn (ctx: *anyopaque, buffer: []f32, interleave: bool) usize,
+    fillAudioBuffer: *const fn (ctx: *anyopaque, buffer: []f32) usize,
     persistBattery: *const fn (ctx: *anyopaque) void,
     deinit: *const fn (ctx: *anyopaque) void,
 };
@@ -27,6 +29,10 @@ pub fn render(self: *Self) void {
     if (self.state == .playing) {
         self.vtable.render(self.ptr);
     }
+}
+
+pub fn getTexture(self: *Self) c.Texture {
+    return self.vtable.getTexture(self.ptr);
 }
 
 pub fn resetGame(self: *Self) void {
@@ -71,8 +77,8 @@ pub fn changeRegion(self: *Self, region: Region) void {
     }
 }
 
-pub fn fillAudioBuffer(self: *Self, buffer: []f32, interleave: bool) usize {
-    return self.vtable.fillAudioBuffer(self.ptr, buffer, interleave);
+pub fn fillAudioBuffer(self: *Self, buffer: []f32) usize {
+    return self.vtable.fillAudioBuffer(self.ptr, buffer);
 }
 
 pub fn persistBattery(self: *Self) void {

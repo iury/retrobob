@@ -1,4 +1,4 @@
-const Proxy = @import("../../../proxy.zig").Proxy;
+const Proxy = @import("../../../../proxy.zig").Proxy;
 
 data: u8 = 0,
 

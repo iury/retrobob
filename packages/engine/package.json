@@ -7,7 +7,7 @@
     "prepare": "npm run build",
     "dev": "chokidar \"src/**/*.zig\" -c \"npm run test\"",
     "clean": "rimraf build && rimraf zig-cache",
-    "build": "cross-env-shell zig build -p build --prefix-lib-dir . -Dtarget=wasm32-emscripten --sysroot \"$EMSDK\\upstream\\emscripten\" -Doptimize=ReleaseFast && emcc -O3 -sASSERTIONS=1 -L build -lretrobob -lblip_buf -lraylib -lidbfs.js -o build/retrobob.js -sEXPORTED_FUNCTIONS=FS,IDBFS,_malloc,_free,_main,_terminate,_setNotifyEventFn,_performAction,_getAudioBuffer -sEXPORTED_RUNTIME_METHODS=addFunction -sUSE_GLFW=3 -sMODULARIZE -sEXPORT_ES6 -sUSE_ES6_IMPORT_META -sALLOW_TABLE_GROWTH -sUSE_OFFSET_CONVERTER",
+    "build": "cross-env-shell zig build -p build --prefix-lib-dir . -Dtarget=wasm32-emscripten --sysroot \"$EMSDK\\upstream\\emscripten\" -Doptimize=ReleaseFast && emcc -O3 -sASSERTIONS=1 -sSTACK_SIZE=4194304 -sINITIAL_MEMORY=67108864 -L build -lretrobob -lblip_buf -lraylib -lidbfs.js -o build/retrobob.js -sEXPORTED_FUNCTIONS=FS,IDBFS,_malloc,_free,_main,_terminate,_setNotifyEventFn,_performAction,_getAudioBuffer -sEXPORTED_RUNTIME_METHODS=addFunction -sUSE_GLFW=3 -sMODULARIZE -sEXPORT_ES6 -sUSE_ES6_IMPORT_META -sALLOW_TABLE_GROWTH -sUSE_OFFSET_CONVERTER",
     "build-exe": "zig build -p build --prefix-exe-dir .",
     "test": "zig build test --summary all"
   },

@@ -2,6 +2,7 @@ roms
 build
 zig-cache
 zig-out
+*.st*
 
 # Logs
 logs
