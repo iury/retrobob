@@ -1,3 +1,4 @@
+const std = @import("std");
 const APU = @import("apu.zig");
 const LengthCounter = APU.LengthCounter;
 const Timer = APU.Timer;
@@ -85,5 +86,15 @@ pub const Triangle = struct {
         try jw.objectField("sequence_position");
         try jw.write(self.sequence_position);
         try jw.endObject();
+    }
+
+    pub fn jsonParse(self: *Triangle, value: std.json.Value) void {
+        self.length_counter.jsonParse(value.object.get("length_counter").?);
+        self.timer.jsonParse(value.object.get("timer").?);
+        self.linear_counter = @intCast(value.object.get("linear_counter").?.integer);
+        self.linear_counter_reload = @intCast(value.object.get("linear_counter_reload").?.integer);
+        self.linear_reload_flag = value.object.get("linear_reload_flag").?.bool;
+        self.linear_control_flag = value.object.get("linear_control_flag").?.bool;
+        self.sequence_position = @intCast(value.object.get("sequence_position").?.integer);
     }
 };

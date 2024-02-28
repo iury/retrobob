@@ -102,15 +102,19 @@ pub const AxROM = struct {
         }
     }
 
-    fn jsonParse(ctx: *anyopaque, allocator: std.mem.Allocator, value: std.json.Value) !void {
+    fn jsonParse(ctx: *anyopaque, value: std.json.Value) void {
         const self: *@This() = @ptrCast(@alignCast(ctx));
 
-        const vram = try std.json.parseFromValueLeaky([]u8, allocator, value.object.get("vram").?, .{});
-        @memcpy(self.vram, vram);
+        @memset(self.vram, 0);
+        for (value.object.get("vram").?.array.items, 0..) |v, i| {
+            self.vram[i] = @intCast(v.integer);
+        }
 
-        if (self.chr_ram != null) {
-            const chr_ram = try std.json.parseFromValueLeaky([]u8, allocator, value.object.get("chr_ram").?, .{});
-            @memcpy(self.chr_ram.?, chr_ram);
+        if (self.chr_ram) |chr| {
+            @memset(chr, 0);
+            for (value.object.get("chr_ram").?.array.items, 0..) |v, i| {
+                chr[i] = @intCast(v.integer);
+            }
         }
 
         self.mirroring = @enumFromInt(value.object.get("mirroring").?.integer);

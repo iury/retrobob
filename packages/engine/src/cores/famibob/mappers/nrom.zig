@@ -101,13 +101,18 @@ pub const NROM = struct {
         }
     }
 
-    fn jsonParse(ctx: *anyopaque, allocator: std.mem.Allocator, value: std.json.Value) !void {
+    fn jsonParse(ctx: *anyopaque, value: std.json.Value) void {
         const self: *@This() = @ptrCast(@alignCast(ctx));
 
-        const vram = try std.json.parseFromValueLeaky([]u8, allocator, value.object.get("vram").?, .{});
-        const prg_ram = try std.json.parseFromValueLeaky([]u8, allocator, value.object.get("prg_ram").?, .{});
-        @memcpy(self.vram, vram);
-        @memcpy(self.prg_ram, prg_ram);
+        @memset(self.vram, 0);
+        for (value.object.get("vram").?.array.items, 0..) |v, i| {
+            self.vram[i] = @intCast(v.integer);
+        }
+
+        @memset(self.prg_ram, 0);
+        for (value.object.get("prg_ram").?.array.items, 0..) |v, i| {
+            self.prg_ram[i] = @intCast(v.integer);
+        }
 
         self.mirroring = @enumFromInt(value.object.get("mirroring").?.integer);
     }

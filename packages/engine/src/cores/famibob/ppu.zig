@@ -170,6 +170,7 @@ pub const PPU = struct {
             .mapper = mapper,
             .framebuf = try allocator.alloc(u32, 61440),
         };
+        @memset(instance.framebuf, 0);
         return instance;
     }
 
@@ -895,5 +896,121 @@ pub const PPU = struct {
         try jw.objectField("booting");
         try jw.write(self.booting);
         try jw.endObject();
+    }
+
+    pub fn jsonParse(self: *PPU, value: std.json.Value) void {
+        @memset(&self.oamdata, 0);
+        for (value.object.get("oamdata").?.array.items, 0..) |v, i| {
+            self.oamdata[i] = @intCast(v.integer);
+        }
+
+        @memset(&self.palette, 0);
+        for (value.object.get("palette").?.array.items, 0..) |v, i| {
+            self.palette[i] = @intCast(v.integer);
+        }
+
+        @memset(&self.bgtile, 0);
+        for (value.object.get("bgtile").?.array.items, 0..) |v, i| {
+            self.bgtile[i] = @intCast(v.integer);
+        }
+
+        @memset(&self.bgattr, 0);
+        for (value.object.get("bgattr").?.array.items, 0..) |v, i| {
+            self.bgattr[i] = @intCast(v.integer);
+        }
+
+        @memset(&self.pattern, 0);
+        for (value.object.get("pattern").?.array.items, 0..) |v, i| {
+            self.pattern[i] = @intCast(v.integer);
+        }
+
+        @memset(&self.secondary_oamdata, 0);
+        for (value.object.get("secondary_oamdata").?.array.items, 0..) |v, i| {
+            self.secondary_oamdata[i] = @intCast(v.integer);
+        }
+
+        @memset(&self.has_sprite, false);
+        for (value.object.get("has_sprite").?.array.items, 0..) |v, i| {
+            self.has_sprite[i] = v.bool;
+        }
+
+        @memset(&self.sprite_tiles, .{});
+        for (value.object.get("sprite_tiles").?.array.items, 0..) |v, i| {
+            var tile = &self.sprite_tiles[i];
+            const j = v.object;
+            tile.bg_priority = j.get("bg_priority").?.bool;
+            tile.flip_h = j.get("flip_h").?.bool;
+            tile.palette_offset = @intCast(j.get("palette_offset").?.integer);
+            tile.sprite_x = @intCast(j.get("sprite_x").?.integer);
+            @memset(&tile.pattern, 0);
+            for (j.get("pattern").?.array.items, 0..) |p, k| {
+                tile.pattern[k] = @intCast(p.integer);
+            }
+        }
+
+        const ctrl = value.object.get("ctrl").?.object;
+        self.ctrl.nametable_select = @intCast(ctrl.get("nametable_select").?.integer);
+        self.ctrl.increment_mode = ctrl.get("increment_mode").?.bool;
+        self.ctrl.sprite_select = ctrl.get("sprite_select").?.bool;
+        self.ctrl.background_select = ctrl.get("background_select").?.bool;
+        self.ctrl.large_sprites = ctrl.get("large_sprites").?.bool;
+        self.ctrl.is_master = ctrl.get("is_master").?.bool;
+        self.ctrl.nmi = ctrl.get("nmi").?.bool;
+
+        const mask = value.object.get("mask").?.object;
+        self.mask.grayscale = mask.get("grayscale").?.bool;
+        self.mask.leftmost_background = mask.get("leftmost_background").?.bool;
+        self.mask.leftmost_sprites = mask.get("leftmost_sprites").?.bool;
+        self.mask.show_background = mask.get("show_background").?.bool;
+        self.mask.show_sprites = mask.get("show_sprites").?.bool;
+        self.mask.intensify_red = mask.get("intensify_red").?.bool;
+        self.mask.intensify_green = mask.get("intensify_green").?.bool;
+        self.mask.intensify_blue = mask.get("intensify_blue").?.bool;
+
+        const status = value.object.get("status").?.object;
+        self.status.vblank = status.get("vblank").?.bool;
+        self.status.sprite0_hit = status.get("sprite0_hit").?.bool;
+        self.status.overflow = status.get("overflow").?.bool;
+
+        const scroll = value.object.get("scroll").?.object;
+        self.scroll.t = @intCast(scroll.get("t").?.integer);
+        self.scroll.x = @intCast(scroll.get("x").?.integer);
+        self.scroll.w = scroll.get("w").?.bool;
+
+        self.oamaddr = @intCast(value.object.get("oamaddr").?.integer);
+        self.ppuaddr = @intCast(value.object.get("ppuaddr").?.integer);
+        self.ppudata = @intCast(value.object.get("ppudata").?.integer);
+        self.bgtileaddr = @intCast(value.object.get("bgtileaddr").?.integer);
+        self.bgnextattr = @intCast(value.object.get("bgnextattr").?.integer);
+        self.secondary_oamaddr = @intCast(value.object.get("secondary_oamaddr").?.integer);
+        self.oambuffer = @intCast(value.object.get("oambuffer").?.integer);
+        self.sprite_cnt = @intCast(value.object.get("sprite_cnt").?.integer);
+        self.sprite_idx = @intCast(value.object.get("sprite_idx").?.integer);
+        self.sprite0_visible = value.object.get("sprite0_visible").?.bool;
+        self.sprite0_added = value.object.get("sprite0_added").?.bool;
+        self.sprite_in_range = value.object.get("sprite_in_range").?.bool;
+        self.copy_finished = value.object.get("copy_finished").?.bool;
+        self.overflow_cnt = @intCast(value.object.get("overflow_cnt").?.integer);
+        self.sprite_addr_h = @intCast(value.object.get("sprite_addr_h").?.integer);
+        self.sprite_addr_l = @intCast(value.object.get("sprite_addr_l").?.integer);
+        self.openbus = @intCast(value.object.get("openbus").?.integer);
+        self.odd_frame = value.object.get("odd_frame").?.bool;
+        self.buffer = @intCast(value.object.get("buffer").?.integer);
+        self.dot = @intCast(value.object.get("dot").?.integer);
+        self.scanline = @intCast(value.object.get("scanline").?.integer);
+        self.vblank_line = @intCast(value.object.get("vblank_line").?.integer);
+        self.prerender_line = @intCast(value.object.get("prerender_line").?.integer);
+        self.rendering = value.object.get("rendering").?.bool;
+        self.nmi_requested = value.object.get("nmi_requested").?.bool;
+
+        self.oam_dma = switch (value.object.get("oam_dma").?) {
+            .integer => |v| @intCast(v),
+            else => null,
+        };
+
+        self.booting = switch (value.object.get("booting").?) {
+            .integer => |v| @intCast(v),
+            else => null,
+        };
     }
 };

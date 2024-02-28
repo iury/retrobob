@@ -21,8 +21,6 @@ const MMC1 = @import("mappers/mmc1.zig").MMC1;
 const MMC2 = @import("mappers/mmc2.zig").MMC2;
 const MMC3 = @import("mappers/mmc3.zig").MMC3;
 
-var texture: c.RenderTexture2D = undefined;
-
 pub const Mirroring = enum { horizontal, vertical, single_screen, four_screen };
 
 pub const Famibob = struct {
@@ -41,23 +39,27 @@ pub const Famibob = struct {
     region: Region = .ntsc,
     clock: Clock(Self, .ntsc),
 
-    fn initTexture() void {
-        texture = c.LoadRenderTexture(@intFromFloat(256), @intFromFloat(240));
+    texture: c.RenderTexture2D = undefined,
+
+    fn initTexture(self: *Self) void {
+        self.texture = c.LoadRenderTexture(@intFromFloat(256), @intFromFloat(240));
     }
 
-    fn deinitTexture() void {
-        c.UnloadRenderTexture(texture);
+    fn deinitTexture(self: *Self) void {
+        c.UnloadRenderTexture(self.texture);
     }
 
     pub fn getTexture(ctx: *anyopaque) c.Texture {
+        const self: *@This() = @ptrCast(@alignCast(ctx));
+        return self.texture.texture;
+    }
+
+    pub fn getShader(ctx: *anyopaque) ?c.Shader {
         _ = ctx;
-        return texture.texture;
+        return null;
     }
 
     pub fn init(allocator: std.mem.Allocator, rom_data: []const u8) !*Self {
-        initTexture();
-        errdefer deinitTexture();
-
         const cartridge = try Cartridge.init(std.heap.c_allocator, rom_data);
 
         var mapper: Memory(u16, u8) = undefined;
@@ -124,11 +126,12 @@ pub const Famibob = struct {
         };
 
         instance.cpu.rst_requested = true;
+        instance.initTexture();
         return instance;
     }
 
     pub fn deinit(self: *Self) void {
-        deinitTexture();
+        self.deinitTexture();
         self.ppu.deinit();
         self.cartridge.deinit();
         self.mapper.deinit();
@@ -228,8 +231,6 @@ pub const Famibob = struct {
         var compressor = try std.compress.zlib.compressor(file.writer(), .{ .level = .fast });
         const writer = compressor.writer();
 
-        const serialized_mapper = try self.mapper.jsonStringify(allocator);
-
         try std.json.stringify(.{
             .version = 1,
             .cpu = &self.cpu,
@@ -238,46 +239,11 @@ pub const Famibob = struct {
             .mixer = self.mixer,
             .clock = &self.clock,
             .bus = try self.bus.jsonStringify(allocator),
-            .mapper = serialized_mapper,
+            .mapper = try self.mapper.jsonStringify(allocator),
             .mapper_irq = self.mapper_irq,
         }, .{ .emit_strings_as_arrays = true }, writer);
 
         try compressor.finish();
-    }
-
-    fn parseValue(allocator: std.mem.Allocator, T: type, target: *T, value: std.json.Value) anyerror!void {
-        if (T == std.mem.Allocator or T == Memory(u16, u8) or T == Proxy(u8) or T == c.blip_t) return;
-        const structInfo = @typeInfo(T);
-        var it = value.object.iterator();
-        while (it.next()) |kv| {
-            const field_name = kv.key_ptr.*;
-            inline for (structInfo.Struct.fields) |field| {
-                comptime {
-                    if (std.mem.eql(u8, field.name, "mixer") or std.mem.eql(u8, field.name, "apu") or std.mem.eql(u8, field.name, "timestamps")) continue;
-                }
-                if (std.mem.eql(u8, field.name, field_name)) {
-                    const f = @typeInfo(field.type);
-                    switch (f) {
-                        .Struct => {
-                            try parseValue(allocator, field.type, &@field(target, field.name), kv.value_ptr.*);
-                            break;
-                        },
-                        .Pointer => |p| {
-                            switch (@typeInfo(p.child)) {
-                                .Struct => {
-                                    try parseValue(allocator, p.child, @field(target, field.name), kv.value_ptr.*);
-                                    break;
-                                },
-                                else => {},
-                            }
-                        },
-                        else => {},
-                    }
-                    @field(target, field.name) = try std.json.parseFromValueLeaky(field.type, allocator, kv.value_ptr.*, .{});
-                    break;
-                }
-            }
-        }
     }
 
     pub fn loadState(ctx: *anyopaque, slot: u8) !bool {
@@ -300,19 +266,17 @@ pub const Famibob = struct {
 
         var decompressor = std.compress.zlib.decompressor(file.reader());
         const reader = decompressor.reader();
-        const content = try reader.readAllAlloc(allocator, std.math.maxInt(usize));
+        var json_reader = std.json.Reader(1024, @TypeOf(reader)).init(allocator, reader);
+        var data = try std.json.parseFromTokenSourceLeaky(std.json.Value, allocator, &json_reader, .{});
 
-        const data = try std.json.parseFromSliceLeaky(std.json.Value, allocator, content, .{});
         if (data.object.get("version").?.integer == 1) {
-            try parseValue(allocator, CPU, &self.cpu, data.object.get("cpu").?);
-            try parseValue(allocator, PPU, self.ppu, data.object.get("ppu").?);
-            try parseValue(allocator, APU, self.apu, data.object.get("apu").?);
-            try parseValue(allocator, Clock(Self, .ntsc), &self.clock, data.object.get("clock").?);
-
-            try self.bus.jsonParse(allocator, data.object.get("bus").?);
-            try self.mixer.jsonParse(allocator, data.object.get("mixer").?);
-            try self.mapper.jsonParse(allocator, data.object.get("mapper").?);
-
+            self.cpu.jsonParse(data.object.get("cpu").?);
+            self.ppu.jsonParse(data.object.get("ppu").?);
+            self.apu.jsonParse(data.object.get("apu").?);
+            self.clock.jsonParse(data.object.get("clock").?);
+            self.bus.jsonParse(data.object.get("bus").?);
+            self.mixer.jsonParse(data.object.get("mixer").?);
+            self.mapper.jsonParse(data.object.get("mapper").?);
             if (self.mapper_irq) |irq| {
                 irq.* = data.object.get("mapper_irq").?.bool;
             }
@@ -361,7 +325,7 @@ pub const Famibob = struct {
             self.clock.run(.ppu_cycle);
         }
 
-        c.UpdateTexture(texture.texture, @ptrCast(self.ppu.framebuf));
+        c.UpdateTexture(self.texture.texture, @ptrCast(self.ppu.framebuf));
     }
 
     pub fn core(self: *Self) Core {
@@ -373,6 +337,7 @@ pub const Famibob = struct {
             .vtable = &.{
                 .render = render,
                 .getTexture = getTexture,
+                .getShader = getShader,
                 .resetGame = resetGame,
                 .pauseGame = pauseGame,
                 .resumeGame = resumeGame,

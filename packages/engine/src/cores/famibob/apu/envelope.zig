@@ -1,3 +1,4 @@
+const std = @import("std");
 const LengthCounter = @import("apu.zig").LengthCounter;
 
 pub const Envelope = struct {
@@ -68,5 +69,14 @@ pub const Envelope = struct {
         try jw.objectField("counter");
         try jw.write(self.counter);
         try jw.endObject();
+    }
+
+    pub fn jsonParse(self: *Envelope, value: std.json.Value) void {
+        self.length_counter.jsonParse(value.object.get("length_counter").?);
+        self.constant_volume = value.object.get("constant_volume").?.bool;
+        self.volume = @intCast(value.object.get("volume").?.integer);
+        self.start = value.object.get("start").?.bool;
+        self.divider = @intCast(value.object.get("divider").?.integer);
+        self.counter = @intCast(value.object.get("counter").?.integer);
     }
 };

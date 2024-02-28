@@ -138,41 +138,6 @@ pub const Mixer = struct {
         self.updateRates(true);
     }
 
-    pub fn jsonParse(self: *Mixer, allocator: std.mem.Allocator, value: std.json.Value) !void {
-        _ = allocator;
-
-        self.region = std.meta.stringToEnum(Region, value.object.get("region").?.string).?;
-        self.sample_rate = @intCast(value.object.get("sample_rate").?.integer);
-        self.previous_output = @intCast(value.object.get("previous_output").?.integer);
-        self.clock_rate = @intCast(value.object.get("clock_rate").?.integer);
-
-        const buf = @as(*c.struct_blip_t, @ptrCast(@alignCast(self.blip_buf)));
-        c.blip_clear(buf);
-        const blip = value.object.get("blip_buf").?.object;
-        self.blip_buf.factor = @intCast(blip.get("factor").?.integer);
-        self.blip_buf.offset = @intCast(blip.get("offset").?.integer);
-        self.blip_buf.avail = @intCast(blip.get("avail").?.integer);
-        self.blip_buf.size = @intCast(blip.get("size").?.integer);
-        self.blip_buf.integrator = @intCast(blip.get("integrator").?.integer);
-
-        self.timestamps.clearRetainingCapacity();
-        for (value.object.get("timestamps").?.array.items) |v| {
-            try self.timestamps.put(@intCast(v.integer), {});
-        }
-
-        @memset(self.current_output[0..], 0);
-        for (value.object.get("current_output").?.array.items, 0..) |v, i| {
-            self.current_output[i] = @intCast(v.integer);
-        }
-
-        for (0..5) |i| {
-            @memset(self.channel_output[i][0..], 0);
-            for (value.object.get("channel_output").?.array.items[i].array.items, 0..) |v, j| {
-                self.channel_output[i][j] = @intCast(v.integer);
-            }
-        }
-    }
-
     pub fn jsonStringify(self: *const Mixer, jw: anytype) !void {
         try jw.beginObject();
         try jw.objectField("region");
@@ -211,5 +176,38 @@ pub const Mixer = struct {
         try jw.write(stamps.items);
 
         try jw.endObject();
+    }
+
+    pub fn jsonParse(self: *Mixer, value: std.json.Value) void {
+        self.region = std.meta.stringToEnum(Region, value.object.get("region").?.string).?;
+        self.sample_rate = @intCast(value.object.get("sample_rate").?.integer);
+        self.previous_output = @intCast(value.object.get("previous_output").?.integer);
+        self.clock_rate = @intCast(value.object.get("clock_rate").?.integer);
+
+        const buf = @as(*c.struct_blip_t, @ptrCast(@alignCast(self.blip_buf)));
+        c.blip_clear(buf);
+        const blip = value.object.get("blip_buf").?.object;
+        self.blip_buf.factor = @intCast(blip.get("factor").?.integer);
+        self.blip_buf.offset = @intCast(blip.get("offset").?.integer);
+        self.blip_buf.avail = @intCast(blip.get("avail").?.integer);
+        self.blip_buf.size = @intCast(blip.get("size").?.integer);
+        self.blip_buf.integrator = @intCast(blip.get("integrator").?.integer);
+
+        self.timestamps.clearRetainingCapacity();
+        for (value.object.get("timestamps").?.array.items) |v| {
+            self.timestamps.put(@intCast(v.integer), {}) catch unreachable;
+        }
+
+        @memset(self.current_output[0..], 0);
+        for (value.object.get("current_output").?.array.items, 0..) |v, i| {
+            self.current_output[i] = @intCast(v.integer);
+        }
+
+        for (0..5) |i| {
+            @memset(self.channel_output[i][0..], 0);
+            for (value.object.get("channel_output").?.array.items[i].array.items, 0..) |v, j| {
+                self.channel_output[i][j] = @intCast(v.integer);
+            }
+        }
     }
 };

@@ -235,20 +235,6 @@ pub const MemoryBus = struct {
         @memset(self.hiram, 0xff);
     }
 
-    pub fn jsonParse(ctx: *anyopaque, allocator: std.mem.Allocator, value: std.json.Value) !void {
-        const self: *@This() = @ptrCast(@alignCast(ctx));
-
-        const hiram = try std.json.parseFromValueLeaky([]u8, allocator, value.object.get("hiram").?, .{});
-        const wram = try std.json.parseFromValueLeaky([]u8, allocator, value.object.get("wram").?, .{});
-        @memcpy(self.hiram, hiram);
-        @memcpy(self.wram, wram);
-
-        self.ie = @intCast(value.object.get("ie").?.integer);
-        self.svbk = @intCast(value.object.get("svbk").?.integer);
-        self.iflags = @intCast(value.object.get("iflags").?.integer);
-        self.key1 = @intCast(value.object.get("key1").?.integer);
-    }
-
     pub fn jsonStringify(ctx: *anyopaque, allocator: std.mem.Allocator) !std.json.Value {
         const self: *@This() = @ptrCast(@alignCast(ctx));
         var data = std.json.ObjectMap.init(allocator);
@@ -261,6 +247,23 @@ pub const MemoryBus = struct {
         return .{ .object = data };
     }
 
+    pub fn jsonParse(self: *MemoryBus, value: std.json.Value) void {
+        @memset(self.hiram, 0);
+        for (value.object.get("hiram").?.array.items, 0..) |v, i| {
+            self.hiram[i] = @intCast(v.integer);
+        }
+
+        @memset(self.wram, 0);
+        for (value.object.get("wram").?.array.items, 0..) |v, i| {
+            self.wram[i] = @intCast(v.integer);
+        }
+
+        self.ie = @intCast(value.object.get("ie").?.integer);
+        self.svbk = @intCast(value.object.get("svbk").?.integer);
+        self.iflags = @intCast(value.object.get("iflags").?.integer);
+        self.key1 = @intCast(value.object.get("key1").?.integer);
+    }
+
     pub fn memory(self: *MemoryBus) Memory(u16, u8) {
         return .{
             .ptr = self,
@@ -268,7 +271,6 @@ pub const MemoryBus = struct {
                 .read = read,
                 .write = write,
                 .deinit = deinitMemory,
-                .jsonParse = jsonParse,
                 .jsonStringify = jsonStringify,
             },
         };

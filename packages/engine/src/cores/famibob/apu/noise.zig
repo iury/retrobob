@@ -1,3 +1,4 @@
+const std = @import("std");
 const APU = @import("apu.zig");
 const Envelope = APU.Envelope;
 const Timer = APU.Timer;
@@ -72,5 +73,12 @@ pub const Noise = struct {
         try jw.objectField("mode_flag");
         try jw.write(self.mode_flag);
         try jw.endObject();
+    }
+
+    pub fn jsonParse(self: *Noise, value: std.json.Value) void {
+        self.envelope.jsonParse(value.object.get("envelope").?);
+        self.timer.jsonParse(value.object.get("timer").?);
+        self.shift_register = @intCast(value.object.get("shift_register").?.integer);
+        self.mode_flag = value.object.get("mode_flag").?.bool;
     }
 };

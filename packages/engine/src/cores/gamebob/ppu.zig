@@ -87,6 +87,8 @@ pub const PPU = struct {
             .vram = try allocator.alloc(u8, 0x4000),
             .bus = bus,
         };
+        @memset(instance.vram, 0);
+        @memset(instance.framebuf, 0);
         return instance;
     }
 
@@ -704,5 +706,62 @@ pub const PPU = struct {
         try jw.objectField("cycle_counter");
         try jw.write(self.cycle_counter);
         try jw.endObject();
+    }
+
+    pub fn jsonParse(self: *PPU, value: std.json.Value) void {
+        @memset(self.vram, 0);
+        for (value.object.get("vram").?.array.items, 0..) |v, i| {
+            self.vram[i] = @intCast(v.integer);
+        }
+
+        @memset(&self.oam, 0);
+        for (value.object.get("oam").?.array.items, 0..) |v, i| {
+            self.oam[i] = @intCast(v.integer);
+        }
+
+        @memset(&self.bcpd, 0);
+        for (value.object.get("bcpd").?.array.items, 0..) |v, i| {
+            self.bcpd[i] = @intCast(v.integer);
+        }
+
+        @memset(&self.ocpd, 0);
+        for (value.object.get("ocpd").?.array.items, 0..) |v, i| {
+            self.ocpd[i] = @intCast(v.integer);
+        }
+
+        const lcdc = value.object.get("lcdc").?;
+        self.lcdc.bg_enable = lcdc.object.get("bg_enable").?.bool;
+        self.lcdc.obj_enable = lcdc.object.get("obj_enable").?.bool;
+        self.lcdc.obj_big = lcdc.object.get("obj_big").?.bool;
+        self.lcdc.bg_tilemap = lcdc.object.get("bg_tilemap").?.bool;
+        self.lcdc.tiledata = lcdc.object.get("tiledata").?.bool;
+        self.lcdc.wnd_enable = lcdc.object.get("wnd_enable").?.bool;
+        self.lcdc.wnd_tilemap = lcdc.object.get("wnd_tilemap").?.bool;
+        self.lcdc.ppu_enable = lcdc.object.get("ppu_enable").?.bool;
+
+        self.stat = @intCast(value.object.get("stat").?.integer);
+        self.stat_int = value.object.get("stat_int").?.bool;
+        self.scy = @intCast(value.object.get("scy").?.integer);
+        self.scx = @intCast(value.object.get("scx").?.integer);
+        self.ly = @intCast(value.object.get("ly").?.integer);
+        self.lyc = @intCast(value.object.get("lyc").?.integer);
+        self.wly = @intCast(value.object.get("wly").?.integer);
+        self.bgp = @intCast(value.object.get("bgp").?.integer);
+        self.obp0 = @intCast(value.object.get("obp0").?.integer);
+        self.obp1 = @intCast(value.object.get("obp1").?.integer);
+        self.wy = @intCast(value.object.get("wy").?.integer);
+        self.wx = @intCast(value.object.get("wx").?.integer);
+        self.dmg_mode = value.object.get("dmg_mode").?.bool;
+        self.opri = value.object.get("opri").?.bool;
+        self.vbk = @intCast(value.object.get("vbk").?.integer);
+        self.hdma5 = @intCast(value.object.get("hdma5").?.integer);
+        self.hdmad = @intCast(value.object.get("hdmad").?.integer);
+        self.hdmas = @intCast(value.object.get("hdmas").?.integer);
+        self.hdma_cpu_cycles = @intCast(value.object.get("hdma_cpu_cycles").?.integer);
+        self.bcps = @intCast(value.object.get("bcps").?.integer);
+        self.ocps = @intCast(value.object.get("ocps").?.integer);
+        self.mode = @intCast(value.object.get("mode").?.integer);
+        self.mode3_length = @intCast(value.object.get("mode3_length").?.integer);
+        self.cycle_counter = @intCast(value.object.get("cycle_counter").?.integer);
     }
 };

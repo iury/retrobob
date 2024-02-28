@@ -188,6 +188,7 @@ export fn performAction(action: Action, param: u32, ptr: [*c]const u8) void {
                         return;
                     };
                     c.notifyEvent(.state_saved, slot);
+                    drawMsg("State saved");
                 }
             }
         },
@@ -336,7 +337,8 @@ fn mainLoop() callconv(.C) void {
         c.EndDrawing();
     } else {
         c.BeginDrawing();
-        render();
+        updateState();
+        drawMsg(null);
         c.EndDrawing();
     }
 }
@@ -369,13 +371,13 @@ fn handleCmdKeys() void {
     }
 }
 
-fn render() void {
+fn updateState() void {
     if (core) |*cr| {
         const texture = cr.getTexture();
+        const shader = cr.getShader();
 
         if (cr.state == .playing) {
             c.SetWindowTitle(c.TextFormat("retrobob - %d fps", c.GetFPS()));
-            c.ClearBackground(c.BLACK);
             cr.render();
         } else {
             c.SetWindowTitle(c.TextFormat("retrobob"));
@@ -402,14 +404,18 @@ fn render() void {
             }
         }
 
-        c.DrawTexturePro(
-            texture,
-            .{ .x = 0, .y = overscan, .width = @floatFromInt(texture.width), .height = @as(f32, @floatFromInt(texture.height)) - overscan * 2 },
-            .{ .x = (screen_width - target_width) / 2, .y = 0, .width = target_width, .height = @floatFromInt(c.GetScreenHeight()) },
-            .{ .x = 0, .y = 0 },
-            0.0,
-            c.WHITE,
-        );
+        const source = .{ .x = 0, .y = overscan, .width = @as(f32, @floatFromInt(texture.width)), .height = @as(f32, @floatFromInt(texture.height)) - overscan * 2 };
+        const dest = .{ .x = (screen_width - target_width) / 2, .y = 0, .width = target_width, .height = @as(f32, @floatFromInt(c.GetScreenHeight())) };
+        const origin = .{ .x = 0, .y = 0 };
+
+        c.ClearBackground(c.BLACK);
+        if (shader) |s| {
+            c.BeginShaderMode(s);
+            c.DrawTexturePro(texture, source, dest, origin, 0.0, c.WHITE);
+            c.EndShaderMode();
+        } else {
+            c.DrawTexturePro(texture, source, dest, origin, 0.0, c.WHITE);
+        }
     }
 }
 
@@ -418,6 +424,17 @@ fn drawDragMsg() void {
     const fontSize = 20;
     const msg = "Drag a ROM file to start";
     c.DrawText(msg, @divTrunc((c.GetScreenWidth() - c.MeasureText(msg, fontSize)), 2), @divTrunc((c.GetScreenHeight() - fontSize), 2), fontSize, c.LIGHTGRAY);
+}
+
+var msgTimer: ?std.meta.Tuple(&.{ u8, [:0]const u8 }) = null;
+fn drawMsg(msg: ?[:0]const u8) void {
+    if (msg) |m| {
+        msgTimer = .{ 120, m };
+    } else if (msgTimer) |*m| {
+        c.DrawText(m.@"1", @divTrunc((c.GetScreenWidth() - c.MeasureText(m.@"1", 20)), 2), c.GetScreenHeight() - 32, 20, c.LIGHTGRAY);
+        m.@"0" -= 1;
+        if (m.@"0" == 0) msgTimer = null;
+    }
 }
 
 fn resizeScreen() void {

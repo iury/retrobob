@@ -1,3 +1,4 @@
+const std = @import("std");
 const Timer = @import("apu.zig").Timer;
 const Proxy = @import("../../../proxy.zig").Proxy;
 
@@ -201,5 +202,25 @@ pub const DMC = struct {
         try jw.objectField("transfer_requested");
         try jw.write(self.transfer_requested);
         try jw.endObject();
+    }
+
+    pub fn jsonParse(self: *DMC, value: std.json.Value) void {
+        self.timer.jsonParse(value.object.get("timer").?);
+        self.irq_requested = value.object.get("irq_requested").?.bool;
+        self.sample_addr = @intCast(value.object.get("sample_addr").?.integer);
+        self.sample_length = @intCast(value.object.get("sample_length").?.integer);
+        self.output_level = @intCast(value.object.get("output_level").?.integer);
+        self.irq_enabled = value.object.get("irq_enabled").?.bool;
+        self.loop_flag = value.object.get("loop_flag").?.bool;
+        self.current_addr = @intCast(value.object.get("current_addr").?.integer);
+        self.bytes_remaining = @intCast(value.object.get("bytes_remaining").?.integer);
+        self.read_buffer = @intCast(value.object.get("read_buffer").?.integer);
+        self.buffer_empty = value.object.get("buffer_empty").?.bool;
+        self.shift_register = @intCast(value.object.get("shift_register").?.integer);
+        self.bits_remaining = @intCast(value.object.get("bits_remaining").?.integer);
+        self.silence_flag = value.object.get("silence_flag").?.bool;
+        self.needs_to_run = value.object.get("needs_to_run").?.bool;
+        self.needs_init = @intCast(value.object.get("needs_init").?.integer);
+        self.transfer_requested = value.object.get("transfer_requested").?.bool;
     }
 };

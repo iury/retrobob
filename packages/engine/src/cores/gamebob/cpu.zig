@@ -1659,4 +1659,33 @@ pub const CPU = struct {
 
         try jw.endObject();
     }
+
+    pub fn jsonParse(self: *CPU, value: std.json.Value) void {
+        self.cycle_counter = @intCast(value.object.get("cycle_counter").?.integer);
+        self.mode = std.meta.stringToEnum(@TypeOf(self.mode), value.object.get("mode").?.string).?;
+        self.pc = @intCast(value.object.get("pc").?.integer);
+        self.sp = @intCast(value.object.get("sp").?.integer);
+        self.ime = value.object.get("ime").?.bool;
+        self.ei_pending = value.object.get("ei_pending").?.bool;
+
+        const af = value.object.get("af").?;
+        self.af.a = @intCast(af.object.get("a").?.integer);
+        const f = af.object.get("f").?;
+        self.af.f.c = f.object.get("c").?.bool;
+        self.af.f.h = f.object.get("h").?.bool;
+        self.af.f.n = f.object.get("n").?.bool;
+        self.af.f.z = f.object.get("z").?.bool;
+
+        const bc = value.object.get("bc").?;
+        self.bc.b = @intCast(bc.object.get("b").?.integer);
+        self.bc.c = @intCast(bc.object.get("c").?.integer);
+
+        const de = value.object.get("de").?;
+        self.de.d = @intCast(de.object.get("d").?.integer);
+        self.de.e = @intCast(de.object.get("e").?.integer);
+
+        const hl = value.object.get("hl").?;
+        self.hl.h = @intCast(hl.object.get("h").?.integer);
+        self.hl.l = @intCast(hl.object.get("l").?.integer);
+    }
 };

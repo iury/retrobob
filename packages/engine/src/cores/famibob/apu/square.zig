@@ -1,3 +1,4 @@
+const std = @import("std");
 const APU = @import("apu.zig");
 const AudioChannel = APU.AudioChannel;
 const Envelope = APU.Envelope;
@@ -161,6 +162,22 @@ pub fn Square(comptime channel: SquareChannel) type {
             try jw.objectField("real_period");
             try jw.write(self.real_period);
             try jw.endObject();
+        }
+
+        pub fn jsonParse(self: *@This(), value: std.json.Value) void {
+            self.envelope.jsonParse(value.object.get("envelope").?);
+            self.timer.jsonParse(value.object.get("timer").?);
+            self.is_mmc5_square = value.object.get("is_mmc5_square").?.bool;
+            self.duty = @intCast(value.object.get("duty").?.integer);
+            self.duty_pos = @intCast(value.object.get("duty_pos").?.integer);
+            self.sweep_enabled = value.object.get("sweep_enabled").?.bool;
+            self.sweep_period = @intCast(value.object.get("sweep_period").?.integer);
+            self.sweep_negate = value.object.get("sweep_negate").?.bool;
+            self.sweep_shift = @intCast(value.object.get("sweep_shift").?.integer);
+            self.reload_sweep = value.object.get("reload_sweep").?.bool;
+            self.sweep_divider = @intCast(value.object.get("sweep_divider").?.integer);
+            self.sweep_target_period = @intCast(value.object.get("sweep_target_period").?.integer);
+            self.real_period = @intCast(value.object.get("real_period").?.integer);
         }
     };
 }

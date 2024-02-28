@@ -12,7 +12,7 @@ pub fn Memory(comptime Address: anytype, comptime Value: anytype) type {
             write: *const fn (ctx: *anyopaque, address: Address, value: Value) void,
             deinit: *const fn (ctx: *anyopaque) void,
             jsonStringify: ?*const fn (ctx: *anyopaque, allocator: std.mem.Allocator) anyerror!std.json.Value = null,
-            jsonParse: ?*const fn (ctx: *anyopaque, allocator: std.mem.Allocator, value: std.json.Value) anyerror!void = null,
+            jsonParse: ?*const fn (ctx: *anyopaque, value: std.json.Value) void = null,
         };
 
         pub fn read(self: *Self, address: Address) Value {
@@ -32,8 +32,8 @@ pub fn Memory(comptime Address: anytype, comptime Value: anytype) type {
             return .null;
         }
 
-        pub fn jsonParse(self: *Self, allocator: std.mem.Allocator, value: std.json.Value) !void {
-            if (self.vtable.jsonParse) |f| try f(self.ptr, allocator, value);
+        pub fn jsonParse(self: *Self, value: std.json.Value) void {
+            if (self.vtable.jsonParse) |f| f(self.ptr, value);
         }
     };
 }

@@ -69,10 +69,13 @@ pub const ROMOnly = struct {
         }
     }
 
-    fn jsonParse(ctx: *anyopaque, allocator: std.mem.Allocator, value: std.json.Value) !void {
+    fn jsonParse(ctx: *anyopaque, value: std.json.Value) void {
         const self: *@This() = @ptrCast(@alignCast(ctx));
-        const ram = try std.json.parseFromValueLeaky([]u8, allocator, value.object.get("ram").?, .{});
-        @memcpy(self.ram, ram);
+
+        @memset(self.ram, 0);
+        for (value.object.get("ram").?.array.items, 0..) |v, i| {
+            self.ram[i] = @intCast(v.integer);
+        }
     }
 
     fn jsonStringify(ctx: *anyopaque, allocator: std.mem.Allocator) !std.json.Value {

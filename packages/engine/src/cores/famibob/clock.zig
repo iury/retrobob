@@ -1,3 +1,4 @@
+const std = @import("std");
 const Region = @import("../core.zig").Region;
 
 pub const RunOption = enum { frame, cpu_cycle, ppu_cycle };
@@ -94,6 +95,11 @@ pub fn Clock(comptime T: anytype, comptime region: Region) type {
             try jw.objectField("ppu_counter");
             try jw.write(self.ppu_counter);
             try jw.endObject();
+        }
+
+        pub fn jsonParse(self: *Self, value: std.json.Value) void {
+            self.cpu_counter = @intCast(value.object.get("cpu_counter").?.integer);
+            self.ppu_counter = @intCast(value.object.get("ppu_counter").?.integer);
         }
     };
 }

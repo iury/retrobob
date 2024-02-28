@@ -1,3 +1,4 @@
+const std = @import("std");
 const APU = @import("apu.zig").APU;
 
 pub const FrameCounter = struct {
@@ -115,5 +116,16 @@ pub const FrameCounter = struct {
         try jw.objectField("write_delay_counter");
         try jw.write(self.write_delay_counter);
         try jw.endObject();
+    }
+
+    pub fn jsonParse(self: *FrameCounter, value: std.json.Value) void {
+        self.irq_requested = value.object.get("irq_requested").?.bool;
+        self.previous_cycle = @intCast(value.object.get("previous_cycle").?.integer);
+        self.current_step = @intCast(value.object.get("current_step").?.integer);
+        self.step_mode = @intCast(value.object.get("step_mode").?.integer);
+        self.inhibit_irq = value.object.get("inhibit_irq").?.bool;
+        self.block_tick = @intCast(value.object.get("block_tick").?.integer);
+        self.new_value = @intCast(value.object.get("new_value").?.integer);
+        self.write_delay_counter = @intCast(value.object.get("write_delay_counter").?.integer);
     }
 };

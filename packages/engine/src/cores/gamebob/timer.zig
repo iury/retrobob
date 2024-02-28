@@ -128,4 +128,22 @@ pub const Timer = struct {
         try jw.write(self.tac);
         try jw.endObject();
     }
+
+    pub fn jsonParse(self: *Timer, value: std.json.Value) void {
+        const counter = value.object.get("counter").?;
+        self.counter.div = @intCast(counter.object.get("div").?.integer);
+        self.counter.tickers = @intCast(counter.object.get("tickers").?.integer);
+
+        const tac = value.object.get("tac").?;
+        self.tac.divider = std.meta.stringToEnum(@TypeOf(self.tac.divider), tac.object.get("divider").?.string).?;
+        self.tac.enable = tac.object.get("enable").?.bool;
+
+        self.overflow = switch (value.object.get("overflow").?) {
+            .bool => |v| v,
+            else => null,
+        };
+
+        self.tima = @intCast(value.object.get("tima").?.integer);
+        self.tma = @intCast(value.object.get("tma").?.integer);
+    }
 };

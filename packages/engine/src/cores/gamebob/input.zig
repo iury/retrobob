@@ -123,4 +123,14 @@ pub const Input = struct {
         try jw.write(self.p1);
         try jw.endObject();
     }
+
+    pub fn jsonParse(self: *Input, value: std.json.Value) void {
+        const p1 = value.object.get("p1").?;
+        self.p1.a_right = p1.object.get("a_right").?.bool;
+        self.p1.b_left = p1.object.get("b_left").?.bool;
+        self.p1.select_up = p1.object.get("select_up").?.bool;
+        self.p1.start_down = p1.object.get("start_down").?.bool;
+        self.p1.dpad = p1.object.get("dpad").?.bool;
+        self.p1.button = p1.object.get("button").?.bool;
+    }
 };

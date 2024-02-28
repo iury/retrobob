@@ -19,9 +19,8 @@ const MBC2 = @import("mappers/mbc2.zig").MBC2;
 const MBC3 = @import("mappers/mbc3.zig").MBC3;
 const MBC5 = @import("mappers/mbc5.zig").MBC5;
 
-var texture: c.RenderTexture2D = undefined;
-
 const PALETTES = @import("dmg_palettes.zig").PALETTES;
+const FRAG = @embedFile("shader.glsl");
 
 pub const Gamebob = struct {
     const Self = @This();
@@ -38,23 +37,30 @@ pub const Gamebob = struct {
     clock: Clock(Self),
     dmg_colors: u2 = 0,
 
-    fn initTexture() void {
-        texture = c.LoadRenderTexture(@intFromFloat(160), @intFromFloat(144));
+    texture: c.RenderTexture2D = undefined,
+    shader: c.Shader = undefined,
+
+    fn initTexture(self: *Self) void {
+        self.texture = c.LoadRenderTexture(@intFromFloat(160), @intFromFloat(144));
+        self.shader = c.LoadShaderFromMemory(0, FRAG);
     }
 
-    fn deinitTexture() void {
-        c.UnloadRenderTexture(texture);
+    fn deinitTexture(self: *Self) void {
+        c.UnloadRenderTexture(self.texture);
+        c.UnloadShader(self.shader);
     }
 
     pub fn getTexture(ctx: *anyopaque) c.Texture {
-        _ = ctx;
-        return texture.texture;
+        const self: *@This() = @ptrCast(@alignCast(ctx));
+        return self.texture.texture;
+    }
+
+    pub fn getShader(ctx: *anyopaque) ?c.Shader {
+        const self: *@This() = @ptrCast(@alignCast(ctx));
+        return self.shader;
     }
 
     pub fn init(allocator: std.mem.Allocator, rom_data: []const u8) !*Self {
-        initTexture();
-        errdefer deinitTexture();
-
         const cartridge = try Cartridge.init(allocator, rom_data);
 
         var mapper: Memory(u16, u8) = undefined;
@@ -120,11 +126,12 @@ pub const Gamebob = struct {
         };
 
         Gamebob.resetGame(instance);
+        instance.initTexture();
         return instance;
     }
 
     pub fn deinit(self: *Self) void {
-        deinitTexture();
+        self.deinitTexture();
         self.ppu.deinit();
         self.apu.deinit();
         self.cartridge.deinit();
@@ -252,38 +259,6 @@ pub const Gamebob = struct {
         try compressor.finish();
     }
 
-    fn parseValue(allocator: std.mem.Allocator, T: type, target: *T, value: std.json.Value) anyerror!void {
-        if (T == std.mem.Allocator or T == Memory(u16, u8) or T == Proxy(bool)) return;
-        const structInfo = @typeInfo(T);
-        var it = value.object.iterator();
-        while (it.next()) |kv| {
-            const field_name = kv.key_ptr.*;
-            inline for (structInfo.Struct.fields) |field| {
-                if (std.mem.eql(u8, field.name, field_name)) {
-                    const f = @typeInfo(field.type);
-                    switch (f) {
-                        .Struct => {
-                            try parseValue(allocator, field.type, &@field(target, field.name), kv.value_ptr.*);
-                            break;
-                        },
-                        .Pointer => |p| {
-                            switch (@typeInfo(p.child)) {
-                                .Struct => {
-                                    try parseValue(allocator, p.child, @field(target, field.name), kv.value_ptr.*);
-                                    break;
-                                },
-                                else => {},
-                            }
-                        },
-                        else => {},
-                    }
-                    @field(target, field.name) = try std.json.parseFromValueLeaky(field.type, allocator, kv.value_ptr.*, .{});
-                    break;
-                }
-            }
-        }
-    }
-
     pub fn loadState(ctx: *anyopaque, slot: u8) !bool {
         const self: *@This() = @ptrCast(@alignCast(ctx));
 
@@ -299,29 +274,22 @@ pub const Gamebob = struct {
             const path = try std.fmt.allocPrintZ(allocator, "gb_{X}.st{d}", .{ self.cartridge.crc, slot });
             file = std.fs.cwd().openFileZ(path, .{}) catch return false;
         }
-
         defer file.close();
 
         var decompressor = std.compress.zlib.decompressor(file.reader());
         const reader = decompressor.reader();
-        const content = try reader.readAllAlloc(allocator, std.math.maxInt(usize));
+        var json_reader = std.json.Reader(1024, @TypeOf(reader)).init(allocator, reader);
+        var data = try std.json.parseFromTokenSourceLeaky(std.json.Value, allocator, &json_reader, .{});
 
-        var data = try std.json.parseFromSliceLeaky(std.json.Value, allocator, content, .{});
         if (data.object.get("version").?.integer == 1) {
-            try parseValue(allocator, CPU, &self.cpu, data.object.get("cpu").?);
-            try parseValue(allocator, APU, self.apu, data.object.get("apu").?);
-            try parseValue(allocator, Input, self.input, data.object.get("input").?);
-            try parseValue(allocator, Timer, self.timer, data.object.get("timer").?);
-            try parseValue(allocator, Clock(Self), &self.clock, data.object.get("clock").?);
-
-            try MemoryBus.jsonParse(self.bus, allocator, data.object.get("bus").?);
-            try self.mapper.jsonParse(allocator, data.object.get("mapper").?);
-
-            var ppu = data.object.get("ppu").?;
-            const vram = try std.json.parseFromValueLeaky([]u8, allocator, ppu.object.get("vram").?, .{});
-            @memcpy(self.ppu.vram, vram);
-            _ = ppu.object.swapRemove("vram");
-            try parseValue(allocator, PPU, self.ppu, ppu);
+            self.cpu.jsonParse(data.object.get("cpu").?);
+            self.apu.jsonParse(data.object.get("apu").?);
+            self.input.jsonParse(data.object.get("input").?);
+            self.timer.jsonParse(data.object.get("timer").?);
+            self.clock.jsonParse(data.object.get("clock").?);
+            self.bus.jsonParse(data.object.get("bus").?);
+            self.mapper.jsonParse(data.object.get("mapper").?);
+            self.ppu.jsonParse(data.object.get("ppu").?);
         } else return false;
 
         return true;
@@ -379,7 +347,7 @@ pub const Gamebob = struct {
             }
         }
 
-        c.UpdateTexture(texture.texture, @ptrCast(self.ppu.output));
+        c.UpdateTexture(self.texture.texture, @ptrCast(self.ppu.output));
     }
 
     pub fn core(self: *Self) Core {
@@ -391,6 +359,7 @@ pub const Gamebob = struct {
             .vtable = &.{
                 .render = render,
                 .getTexture = getTexture,
+                .getShader = getShader,
                 .resetGame = resetGame,
                 .pauseGame = pauseGame,
                 .resumeGame = resumeGame,

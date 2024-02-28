@@ -476,6 +476,38 @@ pub const CPU = struct {
         try jw.write(self.irq_requested);
         try jw.endObject();
     }
+
+    pub fn jsonParse(self: *CPU, value: std.json.Value) void {
+        self.cycle_counter = @intCast(value.object.get("cycle_counter").?.integer);
+        self.current_cycle = std.meta.stringToEnum(@TypeOf(self.current_cycle), value.object.get("current_cycle").?.string).?;
+        self.next_cycle = std.meta.stringToEnum(@TypeOf(self.next_cycle), value.object.get("next_cycle").?.string).?;
+
+        self.dmc_dma = value.object.get("dmc_dma").?.bool;
+        self.oam_dma = value.object.get("oam_dma").?.bool;
+        self.dma_status = std.meta.stringToEnum(@TypeOf(self.dma_status), value.object.get("dma_status").?.string).?;
+        self.dma_cycle = std.meta.stringToEnum(@TypeOf(self.dma_cycle), value.object.get("dma_cycle").?.string).?;
+        self.dmc_address = @intCast(value.object.get("dmc_address").?.integer);
+        self.oam_address = @intCast(value.object.get("oam_address").?.integer);
+        self.oam_counter = @intCast(value.object.get("oam_counter").?.integer);
+        self.oam_value = @intCast(value.object.get("oam_value").?.integer);
+
+        self.pc = @intCast(value.object.get("pc").?.integer);
+        self.sp = @intCast(value.object.get("sp").?.integer);
+        self.acc = @intCast(value.object.get("acc").?.integer);
+        self.x = @intCast(value.object.get("x").?.integer);
+        self.y = @intCast(value.object.get("y").?.integer);
+        self.c = value.object.get("c").?.bool;
+        self.z = value.object.get("z").?.bool;
+        self.i = value.object.get("i").?.bool;
+        self.d = value.object.get("d").?.bool;
+        self.b = value.object.get("b").?.bool;
+        self.v = value.object.get("v").?.bool;
+        self.n = value.object.get("n").?.bool;
+        self.irq_occurred = value.object.get("irq_occurred").?.bool;
+        self.nmi_requested = value.object.get("nmi_requested").?.bool;
+        self.rst_requested = value.object.get("rst_requested").?.bool;
+        self.irq_requested = value.object.get("irq_requested").?.bool;
+    }
 };
 
 test {

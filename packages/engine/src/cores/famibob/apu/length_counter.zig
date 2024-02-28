@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const LengthCounter = struct {
     const lookup_table: []const u8 = &[_]u8{ 10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30 };
 
@@ -68,5 +70,14 @@ pub const LengthCounter = struct {
         try jw.objectField("previous_value");
         try jw.write(self.previous_value);
         try jw.endObject();
+    }
+
+    pub fn jsonParse(self: *LengthCounter, value: std.json.Value) void {
+        self.new_halt_value = value.object.get("new_halt_value").?.bool;
+        self.enabled = value.object.get("enabled").?.bool;
+        self.halt = value.object.get("halt").?.bool;
+        self.counter = @intCast(value.object.get("counter").?.integer);
+        self.reload_value = @intCast(value.object.get("reload_value").?.integer);
+        self.previous_value = @intCast(value.object.get("previous_value").?.integer);
     }
 };

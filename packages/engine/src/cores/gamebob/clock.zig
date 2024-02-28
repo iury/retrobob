@@ -1,3 +1,4 @@
+const std = @import("std");
 const Proxy = @import("../../proxy.zig").Proxy;
 
 pub const RunOption = enum { frame, cpu_cycle, ppu_cycle };
@@ -84,6 +85,11 @@ pub fn Clock(comptime T: anytype) type {
             try jw.objectField("cpu_counter");
             try jw.write(self.cpu_counter);
             try jw.endObject();
+        }
+
+        pub fn jsonParse(self: *Self, value: std.json.Value) void {
+            self.double_speed = value.object.get("double_speed").?.bool;
+            self.cpu_counter = @intCast(value.object.get("cpu_counter").?.integer);
         }
     };
 }

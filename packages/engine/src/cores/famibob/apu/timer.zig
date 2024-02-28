@@ -1,3 +1,4 @@
+const std = @import("std");
 const APU = @import("apu.zig");
 const AudioChannel = APU.AudioChannel;
 const Mixer = APU.Mixer;
@@ -57,6 +58,13 @@ pub fn Timer(comptime channel: AudioChannel) type {
             try jw.objectField("last_output");
             try jw.write(self.last_output);
             try jw.endObject();
+        }
+
+        pub fn jsonParse(self: *@This(), value: std.json.Value) void {
+            self.previous_cycle = @intCast(value.object.get("previous_cycle").?.integer);
+            self.timer = @intCast(value.object.get("timer").?.integer);
+            self.period = @intCast(value.object.get("period").?.integer);
+            self.last_output = @intCast(value.object.get("last_output").?.integer);
         }
     };
 }

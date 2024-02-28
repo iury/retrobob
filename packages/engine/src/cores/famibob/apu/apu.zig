@@ -320,4 +320,17 @@ pub const APU = struct {
         try jw.write(self.dmc);
         try jw.endObject();
     }
+
+    pub fn jsonParse(self: *APU, value: std.json.Value) void {
+        self.enabled = value.object.get("enabled").?.bool;
+        self.current_cycle = @intCast(value.object.get("current_cycle").?.integer);
+        self.previous_cycle = @intCast(value.object.get("previous_cycle").?.integer);
+        self.needs_to_run = value.object.get("needs_to_run").?.bool;
+        self.frame_counter.jsonParse(value.object.get("frame_counter").?);
+        self.square1.jsonParse(value.object.get("square1").?);
+        self.square2.jsonParse(value.object.get("square2").?);
+        self.triangle.jsonParse(value.object.get("triangle").?);
+        self.noise.jsonParse(value.object.get("noise").?);
+        self.dmc.jsonParse(value.object.get("dmc").?);
+    }
 };

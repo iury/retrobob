@@ -415,33 +415,41 @@ pub const APU = struct {
     }
 
     fn mixer(self: *APU) void {
-        var left_out: f64 = 0;
-        var right_out: f64 = 0;
+        var ch1_left_out: f64 = 1;
+        var ch1_right_out: f64 = 1;
+        var ch2_left_out: f64 = 1;
+        var ch2_right_out: f64 = 1;
+        var ch3_left_out: f64 = 1;
+        var ch3_right_out: f64 = 1;
+        var ch4_left_out: f64 = 1;
+        var ch4_right_out: f64 = 1;
 
         if (self.ctrl.ch1_on) {
-            if (self.panning.ch1_left) left_out -= std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch1_out)) / 15);
-            if (self.panning.ch1_right) right_out -= std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch1_out)) / 15);
+            if (self.panning.ch1_left) ch1_left_out = -std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch1_out)) / 15);
+            if (self.panning.ch1_right) ch1_right_out = -std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch1_out)) / 15);
         }
 
         if (self.ctrl.ch2_on) {
-            if (self.panning.ch2_left) left_out -= std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch2_out)) / 15);
-            if (self.panning.ch2_right) right_out -= std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch2_out)) / 15);
+            if (self.panning.ch2_left) ch2_left_out = -std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch2_out)) / 15);
+            if (self.panning.ch2_right) ch2_right_out = -std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch2_out)) / 15);
         }
 
         if (self.ctrl.ch3_on) {
-            if (self.panning.ch3_left) left_out -= std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch3_out)) / 15);
-            if (self.panning.ch3_right) right_out -= std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch3_out)) / 15);
+            if (self.panning.ch3_left) ch3_left_out = -std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch3_out)) / 15);
+            if (self.panning.ch3_right) ch3_right_out = -std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch3_out)) / 15);
         }
 
         if (self.ctrl.ch4_on) {
-            if (self.panning.ch4_left) left_out -= std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch4_out)) / 15);
-            if (self.panning.ch4_right) right_out -= std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch4_out)) / 15);
+            if (self.panning.ch4_left) ch4_left_out = -std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch4_out)) / 15);
+            if (self.panning.ch4_right) ch4_right_out = -std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch4_out)) / 15);
         }
 
-        left_out *= @as(f64, @floatFromInt(@as(u4, self.volume.left) + 1)) / 8.0 * 0.6;
-        right_out *= @as(f64, @floatFromInt(@as(u4, self.volume.right) + 1)) / 8.0 * 0.6;
-        const left: i32 = @intFromFloat(std.math.lerp(@as(f64, @floatFromInt(std.math.minInt(i16))), @as(f64, @floatFromInt(std.math.maxInt(i16))), (left_out / 4.0 + 1) / 2));
-        const right: i32 = @intFromFloat(std.math.lerp(@as(f64, @floatFromInt(std.math.minInt(i16))), @as(f64, @floatFromInt(std.math.maxInt(i16))), (right_out / 4.0 + 1) / 2));
+        var left_out: f64 = (ch1_left_out + ch2_left_out + ch3_left_out + ch4_left_out) / 4.0 * 0.6;
+        var right_out: f64 = (ch1_right_out + ch2_right_out + ch3_right_out + ch4_right_out) / 4.0 * 0.6;
+        left_out *= @as(f64, @floatFromInt(@as(u4, self.volume.left) + 1)) / 8.0;
+        right_out *= @as(f64, @floatFromInt(@as(u4, self.volume.right) + 1)) / 8.0;
+        const left: i32 = @intFromFloat(std.math.lerp(@as(f64, @floatFromInt(std.math.minInt(i16))), @as(f64, @floatFromInt(std.math.maxInt(i16))), (left_out + 1) / 2));
+        const right: i32 = @intFromFloat(std.math.lerp(@as(f64, @floatFromInt(std.math.minInt(i16))), @as(f64, @floatFromInt(std.math.maxInt(i16))), (right_out + 1) / 2));
 
         const left_buf = @as(*c.struct_blip_t, @ptrCast(@alignCast(self.left_buf)));
         if (left != self.previous_left_output) {
@@ -852,5 +860,142 @@ pub const APU = struct {
         try jw.write(self.ch4_out);
 
         try jw.endObject();
+    }
+
+    pub fn jsonParse(self: *APU, value: std.json.Value) void {
+        @memset(&self.wave, 0);
+        for (value.object.get("wave").?.array.items, 0..) |v, i| {
+            self.wave[i] = @intCast(v.integer);
+        }
+
+        self.apu_clock = @intCast(value.object.get("apu_clock").?.integer);
+        self.previous_left_output = @intCast(value.object.get("previous_left_output").?.integer);
+        self.previous_right_output = @intCast(value.object.get("previous_right_output").?.integer);
+        self.div = @intCast(value.object.get("div").?.integer);
+
+        const left_buf = value.object.get("left_buf").?;
+        self.left_buf.factor = @intCast(left_buf.object.get("factor").?.integer);
+        self.left_buf.offset = @intCast(left_buf.object.get("offset").?.integer);
+        self.left_buf.avail = @intCast(left_buf.object.get("avail").?.integer);
+        self.left_buf.size = @intCast(left_buf.object.get("size").?.integer);
+        self.left_buf.integrator = @intCast(left_buf.object.get("integrator").?.integer);
+
+        const right_buf = value.object.get("right_buf").?;
+        self.right_buf.factor = @intCast(right_buf.object.get("factor").?.integer);
+        self.right_buf.offset = @intCast(right_buf.object.get("offset").?.integer);
+        self.right_buf.avail = @intCast(right_buf.object.get("avail").?.integer);
+        self.right_buf.size = @intCast(right_buf.object.get("size").?.integer);
+        self.right_buf.integrator = @intCast(right_buf.object.get("integrator").?.integer);
+
+        const ctrl = value.object.get("ctrl").?;
+        self.ctrl.ch1_on = ctrl.object.get("ch1_on").?.bool;
+        self.ctrl.ch2_on = ctrl.object.get("ch2_on").?.bool;
+        self.ctrl.ch3_on = ctrl.object.get("ch3_on").?.bool;
+        self.ctrl.ch4_on = ctrl.object.get("ch4_on").?.bool;
+        self.ctrl.enable = ctrl.object.get("enable").?.bool;
+
+        const panning = value.object.get("panning").?;
+        self.panning.ch1_right = panning.object.get("ch1_right").?.bool;
+        self.panning.ch2_right = panning.object.get("ch2_right").?.bool;
+        self.panning.ch3_right = panning.object.get("ch3_right").?.bool;
+        self.panning.ch4_right = panning.object.get("ch4_right").?.bool;
+        self.panning.ch1_left = panning.object.get("ch1_left").?.bool;
+        self.panning.ch2_left = panning.object.get("ch2_left").?.bool;
+        self.panning.ch3_left = panning.object.get("ch3_left").?.bool;
+        self.panning.ch4_left = panning.object.get("ch4_left").?.bool;
+
+        const volume = value.object.get("volume").?;
+        self.volume.right = @intCast(volume.object.get("right").?.integer);
+        self.volume.vin_right = @intCast(volume.object.get("vin_right").?.integer);
+        self.volume.left = @intCast(volume.object.get("left").?.integer);
+        self.volume.vin_left = @intCast(volume.object.get("vin_left").?.integer);
+
+        const ch1_sweep = value.object.get("ch1_sweep").?;
+        self.ch1_sweep.step = @intCast(ch1_sweep.object.get("step").?.integer);
+        self.ch1_sweep.direction = std.meta.stringToEnum(@TypeOf(self.ch1_sweep.direction), ch1_sweep.object.get("direction").?.string).?;
+        self.ch1_sweep.pace = @intCast(ch1_sweep.object.get("pace").?.integer);
+        self.ch1_sweep.current_pace = @intCast(ch1_sweep.object.get("current_pace").?.integer);
+
+        const ch1_length_timer = value.object.get("ch1_length_timer").?;
+        self.ch1_length_timer.length = @intCast(ch1_length_timer.object.get("length").?.integer);
+        self.ch1_length_timer.duty = @intCast(ch1_length_timer.object.get("duty").?.integer);
+        self.ch1_length_timer.duty_step = @intCast(ch1_length_timer.object.get("duty_step").?.integer);
+
+        const ch1_envelope = value.object.get("ch1_envelope").?;
+        self.ch1_envelope.pace = @intCast(ch1_envelope.object.get("pace").?.integer);
+        self.ch1_envelope.direction = std.meta.stringToEnum(@TypeOf(self.ch1_envelope.direction), ch1_envelope.object.get("direction").?.string).?;
+        self.ch1_envelope.initial_volume = @intCast(ch1_envelope.object.get("initial_volume").?.integer);
+        self.ch1_envelope.current_pace = @intCast(ch1_envelope.object.get("current_pace").?.integer);
+        self.ch1_envelope.volume = @intCast(ch1_envelope.object.get("volume").?.integer);
+
+        const ch1_control = value.object.get("ch1_control").?;
+        self.ch1_control.period_high = @intCast(ch1_control.object.get("period_high").?.integer);
+        self.ch1_control.length_enable = ch1_control.object.get("length_enable").?.bool;
+        self.ch1_control.trigger = ch1_control.object.get("trigger").?.bool;
+
+        self.ch1_period_low = @intCast(value.object.get("ch1_period_low").?.integer);
+        self.ch1_period = @intCast(value.object.get("ch1_period").?.integer);
+        self.ch1_out = @intCast(value.object.get("ch1_out").?.integer);
+
+        const ch2_length_timer = value.object.get("ch2_length_timer").?;
+        self.ch2_length_timer.length = @intCast(ch2_length_timer.object.get("length").?.integer);
+        self.ch2_length_timer.duty = @intCast(ch2_length_timer.object.get("duty").?.integer);
+        self.ch2_length_timer.duty_step = @intCast(ch2_length_timer.object.get("duty_step").?.integer);
+
+        const ch2_envelope = value.object.get("ch2_envelope").?;
+        self.ch2_envelope.pace = @intCast(ch2_envelope.object.get("pace").?.integer);
+        self.ch2_envelope.direction = std.meta.stringToEnum(@TypeOf(self.ch2_envelope.direction), ch2_envelope.object.get("direction").?.string).?;
+        self.ch2_envelope.initial_volume = @intCast(ch2_envelope.object.get("initial_volume").?.integer);
+        self.ch2_envelope.current_pace = @intCast(ch2_envelope.object.get("current_pace").?.integer);
+        self.ch2_envelope.volume = @intCast(ch2_envelope.object.get("volume").?.integer);
+
+        const ch2_control = value.object.get("ch2_control").?;
+        self.ch2_control.period_high = @intCast(ch2_control.object.get("period_high").?.integer);
+        self.ch2_control.length_enable = ch2_control.object.get("length_enable").?.bool;
+        self.ch2_control.trigger = ch2_control.object.get("trigger").?.bool;
+
+        self.ch2_period_low = @intCast(value.object.get("ch2_period_low").?.integer);
+        self.ch2_period = @intCast(value.object.get("ch2_period").?.integer);
+        self.ch2_out = @intCast(value.object.get("ch2_out").?.integer);
+        self.ch3_enable = value.object.get("ch3_enable").?.bool;
+        self.ch3_length_timer = @intCast(value.object.get("ch3_length_timer").?.integer);
+        self.ch3_output = std.meta.stringToEnum(@TypeOf(self.ch3_output), value.object.get("ch3_output").?.string).?;
+
+        const ch3_control = value.object.get("ch3_control").?;
+        self.ch3_control.period_high = @intCast(ch3_control.object.get("period_high").?.integer);
+        self.ch3_control.length_enable = ch3_control.object.get("length_enable").?.bool;
+        self.ch3_control.trigger = ch3_control.object.get("trigger").?.bool;
+
+        self.ch3_period_low = @intCast(value.object.get("ch3_period_low").?.integer);
+        self.ch3_period = @intCast(value.object.get("ch3_period").?.integer);
+        self.ch3_out = @intCast(value.object.get("ch3_out").?.integer);
+
+        self.wave_index = @intCast(value.object.get("wave_index").?.integer);
+        self.next_wave = @intCast(value.object.get("next_wave").?.integer);
+
+        const ch4_length_timer = value.object.get("ch4_length_timer").?;
+        self.ch4_length_timer.length = @intCast(ch4_length_timer.object.get("length").?.integer);
+        self.ch4_length_timer.duty = @intCast(ch4_length_timer.object.get("duty").?.integer);
+        self.ch4_length_timer.duty_step = @intCast(ch4_length_timer.object.get("duty_step").?.integer);
+
+        const ch4_envelope = value.object.get("ch4_envelope").?;
+        self.ch4_envelope.pace = @intCast(ch4_envelope.object.get("pace").?.integer);
+        self.ch4_envelope.direction = std.meta.stringToEnum(@TypeOf(self.ch4_envelope.direction), ch4_envelope.object.get("direction").?.string).?;
+        self.ch4_envelope.initial_volume = @intCast(ch4_envelope.object.get("initial_volume").?.integer);
+        self.ch4_envelope.current_pace = @intCast(ch4_envelope.object.get("current_pace").?.integer);
+        self.ch4_envelope.volume = @intCast(ch4_envelope.object.get("volume").?.integer);
+
+        const ch4_control = value.object.get("ch4_control").?;
+        self.ch4_control.period_high = @intCast(ch4_control.object.get("period_high").?.integer);
+        self.ch4_control.length_enable = ch4_control.object.get("length_enable").?.bool;
+        self.ch4_control.trigger = ch4_control.object.get("trigger").?.bool;
+
+        const ch4_frequency = value.object.get("ch4_frequency").?;
+        self.ch4_frequency.divider = @intCast(ch4_frequency.object.get("divider").?.integer);
+        self.ch4_frequency.lfsr_width = std.meta.stringToEnum(@TypeOf(self.ch4_frequency.lfsr_width), ch4_frequency.object.get("lfsr_width").?.string).?;
+        self.ch4_frequency.shift = @intCast(ch4_frequency.object.get("shift").?.integer);
+        self.ch4_frequency.lfsr = @intCast(ch4_frequency.object.get("lfsr").?.integer);
+
+        self.ch4_out = @intCast(value.object.get("ch4_out").?.integer);
     }
 };
