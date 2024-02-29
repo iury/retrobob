@@ -14,9 +14,7 @@ pub const MBC1 = struct {
 
     pub fn init(allocator: std.mem.Allocator, cartridge: *Cartridge) !*@This() {
         std.debug.print("Mapper: MBC1\n", .{});
-
-        var instance = try allocator.create(MBC1);
-
+        const instance = try allocator.create(MBC1);
         instance.* = .{
             .allocator = allocator,
             .rom = cartridge.rom_data,
@@ -26,13 +24,7 @@ pub const MBC1 = struct {
             .ram_bank = 0,
             .bank_mode = 0,
         };
-
-        var rnd = std.rand.DefaultPrng.init(@bitCast(std.time.timestamp()));
-        const random = rnd.random();
-        for (0..instance.ram.len) |i| {
-            instance.ram[i] = random.int(u8);
-        }
-
+        @memset(instance.ram, 0);
         return instance;
     }
 

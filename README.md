@@ -50,7 +50,6 @@ A gamepad (Xbox/PS) or keyboard:
 ### GB / GBC
 
 - Only the main mappers are implemented but most commercial games should work.
-- MBC3's internal clock does not tick and will always return 00:00:00.
 - Games in monochrome will use a color palette like playing on a GBC hardware by default but you can toggle it by pressing T.
 
 #### Known Issues

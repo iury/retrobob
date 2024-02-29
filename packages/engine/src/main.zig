@@ -374,7 +374,6 @@ fn handleCmdKeys() void {
 fn updateState() void {
     if (core) |*cr| {
         const texture = cr.getTexture();
-        const shader = cr.getShader();
 
         if (cr.state == .playing) {
             c.SetWindowTitle(c.TextFormat("retrobob - %d fps", c.GetFPS()));
@@ -404,11 +403,13 @@ fn updateState() void {
             }
         }
 
-        const source = .{ .x = 0, .y = overscan, .width = @as(f32, @floatFromInt(texture.width)), .height = @as(f32, @floatFromInt(texture.height)) - overscan * 2 };
-        const dest = .{ .x = (screen_width - target_width) / 2, .y = 0, .width = target_width, .height = @as(f32, @floatFromInt(c.GetScreenHeight())) };
+        const source: c.Rectangle = .{ .x = 0, .y = overscan, .width = @as(f32, @floatFromInt(texture.width)), .height = @as(f32, @floatFromInt(texture.height)) - overscan * 2 };
+        const dest: c.Rectangle = .{ .x = (screen_width - target_width) / 2, .y = 0, .width = target_width, .height = @as(f32, @floatFromInt(c.GetScreenHeight())) };
         const origin = .{ .x = 0, .y = 0 };
 
         c.ClearBackground(c.BLACK);
+
+        const shader = cr.getShader(source, dest);
         if (shader) |s| {
             c.BeginShaderMode(s);
             c.DrawTexturePro(texture, source, dest, origin, 0.0, c.WHITE);

@@ -75,6 +75,8 @@ pub const PPU = struct {
     mode: u8 = 0,
     mode3_length: u16 = 0,
     cycle_counter: u16 = 0,
+    stat_irq: u8 = 0,
+    irq_counter: u8 = 0,
 
     bus: Memory(u16, u8),
 
@@ -550,12 +552,19 @@ pub const PPU = struct {
         }
 
         if (self.stat_int and !prev_int) {
-            self.bus.write(@intFromEnum(IO.IF), self.bus.read(@intFromEnum(IO.IF)) | 2);
+            self.stat_irq |= 2;
+            self.irq_counter = 5;
         }
     }
 
     pub fn process(self: *PPU) void {
         self.update_stat();
+
+        self.irq_counter -|= 1;
+        if (self.irq_counter == 1) {
+            self.bus.write(@intFromEnum(IO.IF), self.bus.read(@intFromEnum(IO.IF)) | self.stat_irq);
+            self.stat_irq = 0;
+        }
 
         self.cycle_counter -|= 1;
         if (self.cycle_counter > 0) return;
@@ -571,7 +580,8 @@ pub const PPU = struct {
             self.mode = 1;
             if (self.lcdc.ppu_enable) {
                 @memcpy(self.output, self.framebuf);
-                self.bus.write(@intFromEnum(IO.IF), self.bus.read(@intFromEnum(IO.IF)) | 1);
+                self.stat_irq |= 1;
+                self.irq_counter = 5;
             }
         }
 
@@ -604,6 +614,8 @@ pub const PPU = struct {
         self.stat_int = false;
         self.mode3_length = 0;
         self.cycle_counter = 0;
+        self.stat_irq = 0;
+        self.irq_counter = 0;
         self.lcdc = @bitCast(@as(u8, 0x91));
         self.bcps = 0;
         self.ocps = 0;
@@ -705,6 +717,10 @@ pub const PPU = struct {
         try jw.write(self.mode3_length);
         try jw.objectField("cycle_counter");
         try jw.write(self.cycle_counter);
+        try jw.objectField("irq_counter");
+        try jw.write(self.irq_counter);
+        try jw.objectField("stat_irq");
+        try jw.write(self.stat_irq);
         try jw.endObject();
     }
 
@@ -763,5 +779,7 @@ pub const PPU = struct {
         self.mode = @intCast(value.object.get("mode").?.integer);
         self.mode3_length = @intCast(value.object.get("mode3_length").?.integer);
         self.cycle_counter = @intCast(value.object.get("cycle_counter").?.integer);
+        self.irq_counter = @intCast(value.object.get("irq_counter").?.integer);
+        self.stat_irq = @intCast(value.object.get("stat_irq").?.integer);
     }
 };

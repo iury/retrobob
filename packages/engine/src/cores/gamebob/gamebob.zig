@@ -18,6 +18,7 @@ const MBC1 = @import("mappers/mbc1.zig").MBC1;
 const MBC2 = @import("mappers/mbc2.zig").MBC2;
 const MBC3 = @import("mappers/mbc3.zig").MBC3;
 const MBC5 = @import("mappers/mbc5.zig").MBC5;
+const RTC = @import("mappers/rtc.zig").RTC;
 
 const PALETTES = @import("dmg_palettes.zig").PALETTES;
 const FRAG = @embedFile("shader.glsl");
@@ -36,6 +37,7 @@ pub const Gamebob = struct {
     cartridge: *Cartridge,
     clock: Clock(Self),
     dmg_colors: u2 = 0,
+    rtc: ?RTC,
 
     texture: c.RenderTexture2D = undefined,
     shader: c.Shader = undefined,
@@ -55,15 +57,18 @@ pub const Gamebob = struct {
         return self.texture.texture;
     }
 
-    pub fn getShader(ctx: *anyopaque) ?c.Shader {
+    pub fn getShader(ctx: *anyopaque, source: c.Rectangle, dest: c.Rectangle) ?c.Shader {
+        _ = dest;
+        _ = source;
         const self: *@This() = @ptrCast(@alignCast(ctx));
-        return self.shader;
+        return if (self.dmg_colors == 0) self.shader else null;
     }
 
     pub fn init(allocator: std.mem.Allocator, rom_data: []const u8) !*Self {
         const cartridge = try Cartridge.init(allocator, rom_data);
 
         var mapper: Memory(u16, u8) = undefined;
+        var rtc: ?RTC = null;
         switch (cartridge.mapper_id) {
             0x00, 0x08, 0x09 => {
                 var rom_only = try ROMOnly.init(allocator, cartridge);
@@ -77,12 +82,21 @@ pub const Gamebob = struct {
                 var mbc2 = try MBC2.init(allocator, cartridge);
                 mapper = mbc2.memory();
             },
-            0x0f, 0x10, 0x11, 0x12, 0x13 => {
-                var mbc3 = try MBC3.init(allocator, cartridge);
+            0x0f, 0x10 => {
+                var mbc3 = try MBC3.init(allocator, cartridge, true);
+                mapper = mbc3.memory();
+                rtc = mbc3.rtc();
+            },
+            0x11, 0x12, 0x13 => {
+                var mbc3 = try MBC3.init(allocator, cartridge, false);
                 mapper = mbc3.memory();
             },
-            0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e => {
-                var mbc5 = try MBC5.init(allocator, cartridge);
+            0x19, 0x1a, 0x1b => {
+                var mbc5 = try MBC5.init(allocator, cartridge, false);
+                mapper = mbc5.memory();
+            },
+            0x1c, 0x1d, 0x1e => {
+                var mbc5 = try MBC5.init(allocator, cartridge, true);
                 mapper = mbc5.memory();
             },
             else => {
@@ -118,6 +132,7 @@ pub const Gamebob = struct {
             .mapper = mapper,
             .cartridge = cartridge,
             .clock = .{ .handler = instance },
+            .rtc = rtc,
         };
 
         instance.cpu = .{
@@ -161,6 +176,7 @@ pub const Gamebob = struct {
         self.timer.process();
         if (div_apu > 0 and (self.timer.counter.div & div_divider) == 0) {
             self.apu.div_tick();
+            if (self.rtc) |*rtc| rtc.tick();
         }
     }
 

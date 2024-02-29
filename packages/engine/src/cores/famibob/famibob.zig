@@ -40,6 +40,7 @@ pub const Famibob = struct {
     clock: Clock(Self, .ntsc),
 
     texture: c.RenderTexture2D = undefined,
+    shader: c.Shader = undefined,
 
     fn initTexture(self: *Self) void {
         self.texture = c.LoadRenderTexture(@intFromFloat(256), @intFromFloat(240));
@@ -54,8 +55,10 @@ pub const Famibob = struct {
         return self.texture.texture;
     }
 
-    pub fn getShader(ctx: *anyopaque) ?c.Shader {
+    pub fn getShader(ctx: *anyopaque, source: c.Rectangle, dest: c.Rectangle) ?c.Shader {
         _ = ctx;
+        _ = source;
+        _ = dest;
         return null;
     }
 

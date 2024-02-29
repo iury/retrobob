@@ -10,12 +10,11 @@ pub const MBC5 = struct {
     ram_enable: bool,
     rom_bank: u16,
     ram_bank: u8,
+    rumble: bool,
 
-    pub fn init(allocator: std.mem.Allocator, cartridge: *Cartridge) !*@This() {
+    pub fn init(allocator: std.mem.Allocator, cartridge: *Cartridge, rumble: bool) !*@This() {
         std.debug.print("Mapper: MBC5\n", .{});
-
-        var instance = try allocator.create(MBC5);
-
+        const instance = try allocator.create(MBC5);
         instance.* = .{
             .allocator = allocator,
             .rom = cartridge.rom_data,
@@ -23,14 +22,9 @@ pub const MBC5 = struct {
             .ram_enable = false,
             .rom_bank = 1,
             .ram_bank = 0,
+            .rumble = rumble,
         };
-
-        var rnd = std.rand.DefaultPrng.init(@bitCast(std.time.timestamp()));
-        const random = rnd.random();
-        for (0..instance.ram.len) |i| {
-            instance.ram[i] = random.int(u8);
-        }
-
+        @memset(instance.ram, 0);
         return instance;
     }
 
@@ -81,7 +75,11 @@ pub const MBC5 = struct {
                     self.rom_bank |= @as(u16, value & 1) << 8;
                 },
                 0x4000...0x5fff => {
-                    self.ram_bank = value & 0xf;
+                    if (self.rumble) {
+                        self.ram_bank = value & 7;
+                    } else {
+                        self.ram_bank = value & 0xf;
+                    }
                 },
                 0xa000...0xbfff => {
                     if (self.ram_enable and self.ram.len > 0) {

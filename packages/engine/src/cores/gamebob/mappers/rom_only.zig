@@ -9,21 +9,13 @@ pub const ROMOnly = struct {
 
     pub fn init(allocator: std.mem.Allocator, cartridge: *Cartridge) !*@This() {
         std.debug.print("Mapper: ROM Only\n", .{});
-
-        var instance = try allocator.create(ROMOnly);
-
+        const instance = try allocator.create(ROMOnly);
         instance.* = .{
             .allocator = allocator,
             .rom = cartridge.rom_data,
             .ram = try allocator.alloc(u8, cartridge.ram_size),
         };
-
-        var rnd = std.rand.DefaultPrng.init(@bitCast(std.time.timestamp()));
-        const random = rnd.random();
-        for (0..instance.ram.len) |i| {
-            instance.ram[i] = random.int(u8);
-        }
-
+        @memset(instance.ram, 0);
         return instance;
     }
 

@@ -14,7 +14,7 @@ region: Region = .ntsc,
 pub const VTable = struct {
     render: *const fn (ctx: *anyopaque) void,
     getTexture: *const fn (ctx: *anyopaque) c.Texture,
-    getShader: *const fn (ctx: *anyopaque) ?c.Shader,
+    getShader: *const fn (ctx: *anyopaque, source: c.Rectangle, dest: c.Rectangle) ?c.Shader,
     resetGame: *const fn (ctx: *anyopaque) void,
     pauseGame: *const fn (ctx: *anyopaque) void,
     resumeGame: *const fn (ctx: *anyopaque) void,
@@ -36,8 +36,8 @@ pub fn getTexture(self: *Self) c.Texture {
     return self.vtable.getTexture(self.ptr);
 }
 
-pub fn getShader(self: *Self) ?c.Shader {
-    return self.vtable.getShader(self.ptr);
+pub fn getShader(self: *Self, source: c.Rectangle, dest: c.Rectangle) ?c.Shader {
+    return self.vtable.getShader(self.ptr, source, dest);
 }
 
 pub fn resetGame(self: *Self) void {
