@@ -175,7 +175,7 @@ pub const Gamebob = struct {
 
         self.timer.process();
         if (div_apu > 0 and (self.timer.counter.div & div_divider) == 0) {
-            self.apu.div_tick();
+            self.apu.divTick();
             if (self.rtc) |*rtc| rtc.tick();
         }
     }
@@ -249,8 +249,7 @@ pub const Gamebob = struct {
 
         var file: std.fs.File = undefined;
         if (builtin.os.tag == .emscripten) {
-            const version = std.os.getenv("VERSION") orelse ".";
-            const path = try std.fmt.allocPrintZ(allocator, "/data/{s}/gb_{X}.st{d}", .{ version, self.cartridge.crc, slot });
+            const path = try std.fmt.allocPrintZ(allocator, "/saves/gb_{X}.st{d}", .{ self.cartridge.crc, slot });
             file = try std.fs.createFileAbsoluteZ(path, .{});
         } else {
             const path = try std.fmt.allocPrintZ(allocator, "gb_{X}.st{d}", .{ self.cartridge.crc, slot });
@@ -285,8 +284,7 @@ pub const Gamebob = struct {
 
         var file: std.fs.File = undefined;
         if (builtin.os.tag == .emscripten) {
-            const version = std.os.getenv("VERSION") orelse ".";
-            const path = try std.fmt.allocPrintZ(allocator, "/data/{s}/gb_{X}.st{d}", .{ version, self.cartridge.crc, slot });
+            const path = try std.fmt.allocPrintZ(allocator, "/saves/gb_{X}.st{d}", .{ self.cartridge.crc, slot });
             file = std.fs.openFileAbsoluteZ(path, .{}) catch return false;
         } else {
             const path = try std.fmt.allocPrintZ(allocator, "gb_{X}.st{d}", .{ self.cartridge.crc, slot });

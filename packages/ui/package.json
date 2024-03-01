@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "dotenvx run --env-file=../../.env --quiet -- vite",
+    "build": "dotenvx run --env-file=../../.env --quiet -- vite build",
     "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -23,6 +23,7 @@
     "vite-plugin-markdown": "^2.2.0"
   },
   "devDependencies": {
+    "@dotenvx/dotenvx": "^0.24.0",
     "@types/react": "^18.2.61",
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react-swc": "^3.6.0",

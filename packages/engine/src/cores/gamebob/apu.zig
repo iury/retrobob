@@ -359,7 +359,7 @@ pub const APU = struct {
         }
     }
 
-    pub fn div_tick(self: *APU) void {
+    pub fn divTick(self: *APU) void {
         self.div +%= 1;
 
         if (!self.ctrl.enable) return;

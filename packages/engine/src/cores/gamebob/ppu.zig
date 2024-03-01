@@ -264,7 +264,10 @@ pub const PPU = struct {
                     },
                     @intFromEnum(IO.SCY) => self.scy = value,
                     @intFromEnum(IO.SCX) => self.scx = value,
-                    @intFromEnum(IO.LYC) => self.lyc = value,
+                    @intFromEnum(IO.LYC) => {
+                        self.lyc = value;
+                        self.statInterrupt();
+                    },
                     @intFromEnum(IO.DMA) => {
                         for (0..160) |i| {
                             self.oam[i] = self.bus.read(@intCast((@as(u16, value) << 8) + i));
@@ -629,34 +632,39 @@ pub const PPU = struct {
         return self.mode3_length;
     }
 
-    fn update_stat(self: *PPU) void {
-        self.stat = 0x80 | (self.stat & 0x78) | @as(u8, if (self.ly == self.lyc) 4 else 0) | @as(u8, if (self.lcdc.ppu_enable) self.mode else 0);
-
+    fn statInterrupt(self: *PPU) void {
         const prev_int = self.stat_blocking;
         self.stat_blocking = false;
 
         if (self.lcdc.ppu_enable) {
-            if (self.mode == 0 and (self.stat & 0x08) > 0) self.stat_blocking = true;
+            // vblank
             if (self.mode == 1 and (self.stat & 0x10) > 0) self.stat_blocking = true;
-            if (self.mode == 2 and (self.stat & 0x20) > 0) self.stat_blocking = true;
-            if (self.ly == self.lyc and (self.stat & 0x40) > 0) self.stat_blocking = true;
-        }
 
-        if (self.stat_blocking and !prev_int) {
-            self.stat_irq |= 2;
-            self.stat_irq_delay = 5;
+            // oam
+            if ((self.mode == 1 or self.mode == 2) and (self.stat & 0x20) > 0) self.stat_blocking = true;
+
+            // hblank
+            if (self.mode == 0 and (self.stat & 0x08) > 0) self.stat_blocking = true;
+
+            // ly=lyc
+            if (self.ly == self.lyc and (self.stat & 0x40) > 0) self.stat_blocking = true;
+
+            if (self.stat_blocking and !prev_int) {
+                self.stat_irq |= 2;
+                self.stat_irq_delay = 5;
+            }
         }
     }
 
     pub fn process(self: *PPU) void {
-        // LY=LYC must be constantly checked
-        self.update_stat();
-
         self.stat_irq_delay -|= 1;
         if (self.stat_irq_delay == 1) {
             self.bus.write(@intFromEnum(IO.IF), self.bus.read(@intFromEnum(IO.IF)) | self.stat_irq);
             self.stat_irq = 0;
         }
+
+        // LY=LYC must be constantly updated
+        self.stat = 0x80 | (self.stat & 0x78) | @as(u8, if (self.ly == self.lyc) 4 else 0) | @as(u8, if (self.lcdc.ppu_enable) self.mode else 0);
 
         self.cycle_counter -|= 1;
         if (self.cycle_counter > 0) return;
@@ -681,7 +689,7 @@ pub const PPU = struct {
             }
         }
 
-        self.update_stat();
+        self.statInterrupt();
 
         self.cycle_counter = switch (self.mode) {
             0 => self.hblank(),

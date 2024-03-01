@@ -222,8 +222,7 @@ pub const Famibob = struct {
 
         var file: std.fs.File = undefined;
         if (builtin.os.tag == .emscripten) {
-            const version = std.os.getenv("VERSION") orelse ".";
-            const path = try std.fmt.allocPrintZ(allocator, "/data/{s}/nes_{X}.st{d}", .{ version, self.cartridge.crc, slot });
+            const path = try std.fmt.allocPrintZ(allocator, "/saves/nes_{X}.st{d}", .{ self.cartridge.crc, slot });
             file = try std.fs.createFileAbsoluteZ(path, .{});
         } else {
             const path = try std.fmt.allocPrintZ(allocator, "nes_{X}.st{d}", .{ self.cartridge.crc, slot });
@@ -258,8 +257,7 @@ pub const Famibob = struct {
 
         var file: std.fs.File = undefined;
         if (builtin.os.tag == .emscripten) {
-            const version = std.os.getenv("VERSION") orelse ".";
-            const path = try std.fmt.allocPrintZ(allocator, "/data/{s}/nes_{X}.st{d}", .{ version, self.cartridge.crc, slot });
+            const path = try std.fmt.allocPrintZ(allocator, "/saves/nes_{X}.st{d}", .{ self.cartridge.crc, slot });
             file = std.fs.openFileAbsoluteZ(path, .{}) catch return false;
         } else {
             const path = try std.fmt.allocPrintZ(allocator, "nes_{X}.st{d}", .{ self.cartridge.crc, slot });

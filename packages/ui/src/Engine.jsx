@@ -170,7 +170,19 @@ export const Engine = forwardRef(function Engine(props, ref) {
 
           v.FS.mkdir('/data')
           v.FS.mount(v.IDBFS, {}, '/data')
-          v.FS.syncfs(true, () => {})
+
+          v.FS.syncfs(true, () => {
+            // eslint-disable-next-line no-undef
+            const version = __APP_VERSION__
+
+            try {
+              v.FS.stat(`/data/${version}`)
+            } catch {
+              v.FS.mkdir(`/data/${version}`)
+            }
+
+            v.FS.symlink(`/data/${version}`, '/saves')
+          })
           setOverlay(true)
 
           return v
