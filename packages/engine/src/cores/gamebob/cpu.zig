@@ -3,6 +3,9 @@ const IO = @import("io.zig").IO;
 const Memory = @import("../../memory.zig").Memory;
 const Proxy = @import("../../proxy.zig").Proxy;
 
+// see https://gb-archive.github.io/salvage/decoding_gbz80_opcodes/Decoding%20Gamboy%20Z80%20Opcodes.html
+// to make sense of the labels and LUTs
+
 const Opcode = packed struct {
     z: u3,
     y: packed union {
@@ -24,6 +27,10 @@ const Operand = union(enum) {
     ROT: enum(u8) { rlc = 0, rrc, rl, rr, sla, sra, swap, srl },
 };
 
+// normal / STOP / HALT mode
+// switching = changing from or to double speed mode
+// halt_bug = https://rgbds.gbdev.io/docs/v0.7.0/gbz80.7#HALT
+// hang = executed an invalid opcode
 const CPUMode = enum { normal, switching, stop, halt, halt_bug, hang };
 
 pub const CPU = struct {
@@ -113,6 +120,7 @@ pub const CPU = struct {
     }
 
     pub fn process(self: *CPU) void {
+        // enable output to console of every instruction
         const log: bool = false;
 
         self.cycle_counter -|= 1;

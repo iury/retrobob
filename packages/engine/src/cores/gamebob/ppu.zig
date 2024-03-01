@@ -2,81 +2,153 @@ const std = @import("std");
 const IO = @import("io.zig").IO;
 const Memory = @import("../../memory.zig").Memory;
 
+// LCD Control Register
 const LCDC = packed struct {
+    // [DMG] BG enable; [CGB] give OBJ priority
     bg_enable: bool,
+    // 0 = OBJ off; 1 = OBJ on
     obj_enable: bool,
+    // 0 = 8x8; 1 = 8x16
     obj_big: bool,
+    // 0 = 9800–9BFF; 1 = 9C00–9FFF
     bg_tilemap: bool,
+    // 0 = 8800–97FF; 1 = 8000–8FFF
     tiledata: bool,
+    // 0 = Window off; 1 = Window on
     wnd_enable: bool,
+    // 0 = 9800–9BFF; 1 = 9C00–9FFF
     wnd_tilemap: bool,
+    // enable rendering and interruptions
     ppu_enable: bool,
 };
 
-const Sprite = struct {
+// OBJ Attribute Memory, a sprite
+const OAM = struct {
+    // OAM[0], screen + 16
     y: u8,
+    // OAM[1], screen + 8
     x: u8,
-    tile: u8,
+    // OAM[2], tile index inside $8000-$8FFF
+    index: u8,
+
+    // OAM[3], attributes and flags
     attr: packed struct {
+        // [CGB] which of OBP0–7 to use
         cgb_palette: u3,
+        // [CGB] fetch tile from VRAM bank N
         bank: u1,
+        // [DMG] 0 = OBP0, 1 = OBP1
         dmg_palette: u1,
+        // 0 = normal, 1 = OBJ is horizontally mirrored
         flip_h: bool,
+        // 0 = normal, 1 = OBJ is vertically mirrored
         flip_v: bool,
+        // 0 = no, 1 = BG and Window colors 1–3 are drawn over this OBJ
         priority: bool,
     },
+
+    // 2 bpp pattern of the current sprite's row
     pattern: [8]?u2,
 };
 
-const Tileattr = packed struct {
+// [CGB] BG map attributes
+const BGMapAttr = packed struct {
+    // which of BGP0–7 to use
     palette: u3,
+    // fetch tile from VRAM bank N
     bank: u1,
+    // keep for packed alignment
     unsused: u1,
+    // tile is drawn horizontally mirrored
     flip_h: bool,
+    // tile is drawn vertically mirrored
     flip_v: bool,
+    // 0 = no; 1 = BG/Window colors 1–3 are drawn over OBJ, regardless of OBJ priority
     priority: bool,
 };
 
 pub const PPU = struct {
     allocator: std.mem.Allocator,
-    framebuf: []u32,
-    output: []u32,
-    vram: []u8,
 
+    // draw to a framebuffer since the LCD display can be re-enabled off-sync with the main thread's vsync
+    framebuf: []u32,
+    // output to the main thread
+    output: []u32,
+    // 8000-9FFF, CGB has a switchable bank 0/1
+    vram: []u8,
+    // 0 = GCB (Gameboy Color), 1 = DMG (Gameboy)
+    dmg_mode: bool = true,
+    // $FF4F, [CGB] VRAM bank
+    vbk: u8 = 0,
+
+    // $FF40, LCD control
+    lcdc: LCDC = @bitCast(@as(u8, 0x91)),
+    // $FF41, LCD status
+    stat: u8 = 0x81,
+
+    // $FF42, scroll Y
+    scy: u8 = 0,
+    // $FF43, scroll X
+    scx: u8 = 0,
+    // $FF44, current line
+    ly: u8 = 143,
+    // $FF45, line to compare, may generate an IRQ based on STAT
+    lyc: u8 = 0,
+    // internal window LY
+    wly: u8 = 0,
+    // $FF4A, window Y
+    wy: u8 = 0,
+    // $FF4B, window X
+    wx: u8 = 0,
+    // $FF6C, [CGB] OBJ priority mode, 0 = CGB-style priority, 1 = DMG-style priority
+    opri: bool = true,
+
+    // maximum of 40 OBJs (4 bytes per OAM)
     oam: [160]u8 = [_]u8{0} ** 160,
+    // (up to) 10 OBJs for the scanline
     y_oam: [40]u8 = [_]u8{0} ** 40,
+    // how many OBJs for the scanline
     oam_cnt: u8 = 0,
 
-    lcdc: LCDC = @bitCast(@as(u8, 0x91)),
-    stat: u8 = 0x81,
-    stat_int: bool = false,
-    scy: u8 = 0,
-    scx: u8 = 0,
-    ly: u8 = 143,
-    lyc: u8 = 0,
-    wly: u8 = 0,
-    bgp: u8 = 0xfc,
-    obp0: u8 = 0,
-    obp1: u8 = 0,
-    wy: u8 = 0,
-    wx: u8 = 0,
-    dmg_mode: bool = true,
-    opri: bool = true,
-    vbk: u8 = 0,
+    // $FF55, [CGB] write = HDMA, read = how many blocks are left
     hdma5: u8 = 0xff,
-    hdmad: u16 = 0x1ff0,
+    // $FF53 + $FF54, HDMA source address
     hdmas: u16 = 0,
+    // $FF51 + $FF52, HDMA destination address (offset from VRAM)
+    hdmad: u16 = 0x1ff0,
+    // how many cycles the CPU must wait while HDMA is in progress
     hdma_cpu_cycles: u16 = 0,
+
+    // $FF47, [DMG] BG palette
+    bgp: u8 = 0xfc,
+    // $FF48, [DMG] OBJ0 palette
+    obp0: u8 = 0,
+    // $FF49, [DMG] OBJ1 palette
+    obp1: u8 = 0,
+    // $FF68, [CGB] BG palette selector
     bcps: u8 = 0,
+    // $FF6A, [CGB] OBJ palette selector
     ocps: u8 = 0,
+
+    // $FF69, [CGB] BG palettes
     bcpd: [64]u8 = [_]u8{0} ** 64,
+    // $FF6B, [CGB] OBJ palettes
     ocpd: [64]u8 = [_]u8{0} ** 64,
 
-    mode: u8 = 0,
-    mode3_length: u16 = 0,
-    cycle_counter: u16 = 0,
+    // https://gbdev.io/pandocs/Interrupt_Sources.html#int-48--stat-interrupt
+    stat_blocking: bool = false,
+
+    // delay of 1 CPU cycle (4 PPU cycles) to trigger IRQ
+    // this seems to be required for some games to boot, like Altered Space?
+    stat_irq_delay: u8 = 0,
     stat_irq: u8 = 0,
-    irq_counter: u8 = 0,
+
+    // STAT mode, 0-4
+    mode: u8 = 0,
+    // how many cycles mode 3 took, used to calculate mode 0 length
+    mode3_length: u16 = 0,
+    // idle cycle spin to simulate the PPU doing things
+    cycle_counter: u16 = 0,
 
     bus: Memory(u16, u8),
 
@@ -110,6 +182,7 @@ pub const PPU = struct {
         const self: *@This() = @ptrCast(@alignCast(ctx));
         return switch (address) {
             0x8000...0x9fff => blk: {
+                // can't access on mode 3
                 if (!self.lcdc.ppu_enable or (self.stat & 3) != 3) {
                     break :blk self.vram[@as(usize, self.vbk) * 0x2000 + (address - 0x8000)];
                 } else {
@@ -117,6 +190,7 @@ pub const PPU = struct {
                 }
             },
             0xfe00...0xfe9f => blk: {
+                // can't access on mode 2 or 3
                 if (!self.lcdc.ppu_enable or (self.stat & 2) != 2) {
                     break :blk self.oam[address - 0xfe00];
                 } else {
@@ -143,6 +217,7 @@ pub const PPU = struct {
                     @intFromEnum(IO.BCPS) => if (self.dmg_mode) 0xff else self.bcps,
                     @intFromEnum(IO.OCPS) => if (self.dmg_mode) 0xff else self.ocps,
                     @intFromEnum(IO.BCPD) => {
+                        // can't access on mode 3
                         if (!self.dmg_mode and (!self.lcdc.ppu_enable or (self.stat & 3) != 3)) {
                             break :blk self.bcpd[self.bcps & 0x3f];
                         } else {
@@ -150,6 +225,7 @@ pub const PPU = struct {
                         }
                     },
                     @intFromEnum(IO.OCPD) => {
+                        // can't access on mode 3
                         if (!self.dmg_mode and (!self.lcdc.ppu_enable or (self.stat & 3) != 3)) {
                             break :blk self.ocpd[self.ocps & 0x3f];
                         } else {
@@ -167,11 +243,13 @@ pub const PPU = struct {
         const self: *@This() = @ptrCast(@alignCast(ctx));
         switch (address) {
             0x8000...0x9fff => {
+                // can't access on mode 3
                 if (!self.lcdc.ppu_enable or (self.stat & 3) != 3) {
                     self.vram[@as(usize, self.vbk) * 0x2000 + (address - 0x8000)] = value;
                 }
             },
             0xfe00...0xfe9f => {
+                // can't access on mode 2 or 3
                 if (!self.lcdc.ppu_enable or (self.stat & 2) != 2) {
                     self.oam[address - 0xfe00] = value;
                 }
@@ -180,13 +258,17 @@ pub const PPU = struct {
                 switch (address) {
                     @intFromEnum(IO.LCDC) => self.lcdc = @bitCast(value),
                     @intFromEnum(IO.STAT) => {
-                        self.stat = 0x80 | value & 0x78 | @as(u8, if (self.ly == self.lyc) 4 else 0) | @as(u8, if (self.lcdc.ppu_enable) self.mode else 0);
+                        self.stat = 0x80 | (value & 0x78) | //
+                            @as(u8, if (self.ly == self.lyc) 4 else 0) | //
+                            @as(u8, if (self.lcdc.ppu_enable) self.mode else 0);
                     },
                     @intFromEnum(IO.SCY) => self.scy = value,
                     @intFromEnum(IO.SCX) => self.scx = value,
                     @intFromEnum(IO.LYC) => self.lyc = value,
                     @intFromEnum(IO.DMA) => {
-                        for (0..160) |i| self.oam[i] = self.bus.read(@intCast((@as(u16, value) << 8) + i));
+                        for (0..160) |i| {
+                            self.oam[i] = self.bus.read(@intCast((@as(u16, value) << 8) + i));
+                        }
                     },
                     @intFromEnum(IO.BGP) => self.bgp = value,
                     @intFromEnum(IO.OBP0) => self.obp0 = value,
@@ -199,6 +281,8 @@ pub const PPU = struct {
                     @intFromEnum(IO.HDMA1) => {
                         self.hdmas &= 0xf0;
                         self.hdmas |= @as(u16, value) << 8;
+
+                        // filter illegal range
                         switch (self.hdmas) {
                             0xe000...0xffff => {
                                 self.hdmas %= 0x2000;
@@ -220,6 +304,7 @@ pub const PPU = struct {
                         self.hdmad |= value & 0xf0;
                     },
                     @intFromEnum(IO.HDMA5) => {
+                        // https://gbdev.io/pandocs/CGB_Registers.html#ff55--hdma5-cgb-mode-only-vram-dma-lengthmodestart
                         if ((self.hdma5 & 0x80) == 0) {
                             if ((value & 0x80) == 0) {
                                 self.hdma5 |= 0x80;
@@ -246,12 +331,14 @@ pub const PPU = struct {
                     },
                     @intFromEnum(IO.BCPD) => {
                         if (!self.dmg_mode) {
+                            // can't access on mode 3
                             if (!self.lcdc.ppu_enable or (self.stat & 3) != 3) self.bcpd[self.bcps & 0x3f] = value;
                             if (self.bcps & 0x80 > 0) self.bcps = (self.bcps + 1) & 0xbf;
                         }
                     },
                     @intFromEnum(IO.OCPD) => {
                         if (!self.dmg_mode) {
+                            // can't access on mode 3
                             if (!self.lcdc.ppu_enable or (self.stat & 3) != 3) self.ocpd[self.ocps & 0x3f] = value;
                             if (self.ocps & 0x80 > 0) self.ocps = (self.ocps + 1) & 0xbf;
                         }
@@ -272,6 +359,8 @@ pub const PPU = struct {
             self.vram[@as(usize, self.vbk) * 0x2000 + self.hdmad] = self.bus.read(self.hdmas);
             self.hdmas +%= 1;
             self.hdmad += 1;
+
+            // "if the transfer's destination address overflows, the transfer stops prematurely"
             if (self.hdmad == 0x2000) {
                 self.hdmad = 0;
                 self.hdma5 |= 0x80;
@@ -314,20 +403,20 @@ pub const PPU = struct {
         var colors: [160]?u32 = [_]?u32{null} ** 160;
         var priorities: [160]bool = [_]bool{true} ** 160;
         var opaque_sprite: [160]?usize = [_]?usize{null} ** 160;
-        var sprites: [10]Sprite = undefined;
+        var sprites: [10]OAM = undefined;
 
         for (0..self.oam_cnt) |i| {
-            var sprite: Sprite = .{
+            var sprite: OAM = .{
                 .y = self.y_oam[i * 4],
                 .x = self.y_oam[i * 4 + 1],
-                .tile = self.y_oam[i * 4 + 2],
+                .index = self.y_oam[i * 4 + 2],
                 .attr = @bitCast(self.y_oam[i * 4 + 3]),
                 .pattern = [_]?u2{null} ** 8,
             };
 
             var addr: u16 = if (!self.dmg_mode and sprite.attr.bank == 1) 0x2000 else 0;
             {
-                var idx = sprite.tile;
+                var idx = sprite.index;
                 if (!sprite.attr.flip_v) {
                     if (self.lcdc.obj_big) idx &= 0xfe;
                     addr += (@as(u16, idx) * 16) + ((16 - (sprite.y - self.ly)) << 1);
@@ -363,6 +452,8 @@ pub const PPU = struct {
                 if (x_pos >= 0 and x_pos < 160) {
                     const x: usize = @bitCast(x_pos);
 
+                    // DMG = the smaller the X coordinate, the higher the priority
+                    // CGB = only the object's location in OAM determines its priority
                     if (opaque_sprite[x]) |o| {
                         if (self.dmg_mode) {
                             const other = sprites[o];
@@ -386,11 +477,11 @@ pub const PPU = struct {
         return .{ colors, priorities };
     }
 
-    fn fetchTile(self: *PPU, window: bool, lx: u8, ly: u8) std.meta.Tuple(&.{ [8]u2, Tileattr }) {
+    fn fetchTile(self: *PPU, window: bool, lx: u8, ly: u8) std.meta.Tuple(&.{ [8]u2, BGMapAttr }) {
         const base_tilemap = if (window) self.lcdc.wnd_tilemap else self.lcdc.bg_tilemap;
 
         var index: u8 = 0;
-        var attr: Tileattr = undefined;
+        var attr: BGMapAttr = undefined;
         {
             const y: u16 = ly / 8;
             const x: u16 = lx / 8;
@@ -433,10 +524,10 @@ pub const PPU = struct {
     }
 
     fn rgbcolor(cl: u8, ch: u8) u32 {
-        const rgb555: u16 = (@as(u16, ch) << 8) | cl;
-        const r: u32 = ((rgb555 & 0x1f) << 3) | (((rgb555 & 0x1f) >> 2) & 7);
-        const g: u32 = (((rgb555 >> 5) & 0x1f) << 3) | ((((rgb555 >> 5) & 0x1f) >> 2) & 7);
-        const b: u32 = (((rgb555 >> 10) & 0x1f) << 3) | ((((rgb555 >> 10) & 0x1f) >> 2) & 7);
+        const color: u16 = (@as(u16, ch) << 8) | cl;
+        const r: u32 = ((color & 0x1f) << 3) | (((color & 0x1f) >> 2) & 7);
+        const g: u32 = (((color >> 5) & 0x1f) << 3) | ((((color >> 5) & 0x1f) >> 2) & 7);
+        const b: u32 = (((color >> 10) & 0x1f) << 3) | ((((color >> 10) & 0x1f) >> 2) & 7);
         return 0xff000000 | (b << 16) | (g << 8) | r;
     }
 
@@ -445,8 +536,8 @@ pub const PPU = struct {
         if (!self.lcdc.ppu_enable) return self.mode3_length;
         self.mode3_length += (self.scx % 8) + (self.oam_cnt * 6);
 
-        var bgattr: Tileattr = undefined;
-        var wndattr: Tileattr = undefined;
+        var bgattr: BGMapAttr = undefined;
+        var wndattr: BGMapAttr = undefined;
         var wnd_draw: bool = false;
         var wlx: u8 = 0;
 
@@ -541,27 +632,28 @@ pub const PPU = struct {
     fn update_stat(self: *PPU) void {
         self.stat = 0x80 | (self.stat & 0x78) | @as(u8, if (self.ly == self.lyc) 4 else 0) | @as(u8, if (self.lcdc.ppu_enable) self.mode else 0);
 
-        const prev_int = self.stat_int;
-        self.stat_int = false;
+        const prev_int = self.stat_blocking;
+        self.stat_blocking = false;
 
         if (self.lcdc.ppu_enable) {
-            if (self.mode == 0 and (self.stat & 0x08) > 0) self.stat_int = true;
-            if (self.mode == 1 and (self.stat & 0x10) > 0) self.stat_int = true;
-            if (self.mode == 2 and (self.stat & 0x20) > 0) self.stat_int = true;
-            if (self.ly == self.lyc and (self.stat & 0x40) > 0) self.stat_int = true;
+            if (self.mode == 0 and (self.stat & 0x08) > 0) self.stat_blocking = true;
+            if (self.mode == 1 and (self.stat & 0x10) > 0) self.stat_blocking = true;
+            if (self.mode == 2 and (self.stat & 0x20) > 0) self.stat_blocking = true;
+            if (self.ly == self.lyc and (self.stat & 0x40) > 0) self.stat_blocking = true;
         }
 
-        if (self.stat_int and !prev_int) {
+        if (self.stat_blocking and !prev_int) {
             self.stat_irq |= 2;
-            self.irq_counter = 5;
+            self.stat_irq_delay = 5;
         }
     }
 
     pub fn process(self: *PPU) void {
+        // LY=LYC must be constantly checked
         self.update_stat();
 
-        self.irq_counter -|= 1;
-        if (self.irq_counter == 1) {
+        self.stat_irq_delay -|= 1;
+        if (self.stat_irq_delay == 1) {
             self.bus.write(@intFromEnum(IO.IF), self.bus.read(@intFromEnum(IO.IF)) | self.stat_irq);
             self.stat_irq = 0;
         }
@@ -578,10 +670,14 @@ pub const PPU = struct {
             if (self.mode == 1) self.mode = 2;
         } else if (self.ly == 144) {
             self.mode = 1;
+
+            // VBlank INT
             if (self.lcdc.ppu_enable) {
-                @memcpy(self.output, self.framebuf);
                 self.stat_irq |= 1;
-                self.irq_counter = 5;
+                self.stat_irq_delay = 5;
+
+                // flush the frame buffer
+                @memcpy(self.output, self.framebuf);
             }
         }
 
@@ -611,11 +707,11 @@ pub const PPU = struct {
         self.vbk = 0;
         self.mode = 0;
         self.stat = 0x81;
-        self.stat_int = false;
+        self.stat_blocking = false;
         self.mode3_length = 0;
         self.cycle_counter = 0;
         self.stat_irq = 0;
-        self.irq_counter = 0;
+        self.stat_irq_delay = 0;
         self.lcdc = @bitCast(@as(u8, 0x91));
         self.bcps = 0;
         self.ocps = 0;
@@ -640,6 +736,12 @@ pub const PPU = struct {
 
     pub fn jsonStringify(self: *const @This(), jw: anytype) !void {
         try jw.beginObject();
+        try jw.objectField("vram");
+        try jw.write(self.vram);
+        try jw.objectField("dmg_mode");
+        try jw.write(self.dmg_mode);
+        try jw.objectField("vbk");
+        try jw.write(self.vbk);
 
         try jw.objectField("lcdc");
         try jw.beginObject();
@@ -661,14 +763,9 @@ pub const PPU = struct {
         try jw.write(self.lcdc.ppu_enable);
         try jw.endObject();
 
-        try jw.objectField("vram");
-        try jw.write(self.vram);
-        try jw.objectField("oam");
-        try jw.write(self.oam);
         try jw.objectField("stat");
         try jw.write(self.stat);
-        try jw.objectField("stat_int");
-        try jw.write(self.stat_int);
+
         try jw.objectField("scy");
         try jw.write(self.scy);
         try jw.objectField("scx");
@@ -679,30 +776,29 @@ pub const PPU = struct {
         try jw.write(self.lyc);
         try jw.objectField("wly");
         try jw.write(self.wly);
+        try jw.objectField("wy");
+        try jw.write(self.wy);
+        try jw.objectField("wx");
+        try jw.write(self.wx);
+        try jw.objectField("opri");
+        try jw.write(self.opri);
+
+        try jw.objectField("oam");
+        try jw.write(self.oam);
+
+        try jw.objectField("hdma5");
+        try jw.write(self.hdma5);
+        try jw.objectField("hdmas");
+        try jw.write(self.hdmas);
+        try jw.objectField("hdmad");
+        try jw.write(self.hdmad);
+
         try jw.objectField("bgp");
         try jw.write(self.bgp);
         try jw.objectField("obp0");
         try jw.write(self.obp0);
         try jw.objectField("obp1");
         try jw.write(self.obp1);
-        try jw.objectField("wy");
-        try jw.write(self.wy);
-        try jw.objectField("wx");
-        try jw.write(self.wx);
-        try jw.objectField("dmg_mode");
-        try jw.write(self.dmg_mode);
-        try jw.objectField("opri");
-        try jw.write(self.opri);
-        try jw.objectField("vbk");
-        try jw.write(self.vbk);
-        try jw.objectField("hdma5");
-        try jw.write(self.hdma5);
-        try jw.objectField("hdmad");
-        try jw.write(self.hdmad);
-        try jw.objectField("hdmas");
-        try jw.write(self.hdmas);
-        try jw.objectField("hdma_cpu_cycles");
-        try jw.write(self.hdma_cpu_cycles);
         try jw.objectField("bcps");
         try jw.write(self.bcps);
         try jw.objectField("ocps");
@@ -711,16 +807,20 @@ pub const PPU = struct {
         try jw.write(self.bcpd);
         try jw.objectField("ocpd");
         try jw.write(self.ocpd);
+
+        try jw.objectField("stat_blocking");
+        try jw.write(self.stat_blocking);
+        try jw.objectField("stat_irq_delay");
+        try jw.write(self.stat_irq_delay);
+        try jw.objectField("stat_irq");
+        try jw.write(self.stat_irq);
+
         try jw.objectField("mode");
         try jw.write(self.mode);
         try jw.objectField("mode3_length");
         try jw.write(self.mode3_length);
         try jw.objectField("cycle_counter");
         try jw.write(self.cycle_counter);
-        try jw.objectField("irq_counter");
-        try jw.write(self.irq_counter);
-        try jw.objectField("stat_irq");
-        try jw.write(self.stat_irq);
         try jw.endObject();
     }
 
@@ -745,6 +845,9 @@ pub const PPU = struct {
             self.ocpd[i] = @intCast(v.integer);
         }
 
+        self.dmg_mode = value.object.get("dmg_mode").?.bool;
+        self.vbk = @intCast(value.object.get("vbk").?.integer);
+
         const lcdc = value.object.get("lcdc").?;
         self.lcdc.bg_enable = lcdc.object.get("bg_enable").?.bool;
         self.lcdc.obj_enable = lcdc.object.get("obj_enable").?.bool;
@@ -756,30 +859,32 @@ pub const PPU = struct {
         self.lcdc.ppu_enable = lcdc.object.get("ppu_enable").?.bool;
 
         self.stat = @intCast(value.object.get("stat").?.integer);
-        self.stat_int = value.object.get("stat_int").?.bool;
+
         self.scy = @intCast(value.object.get("scy").?.integer);
         self.scx = @intCast(value.object.get("scx").?.integer);
         self.ly = @intCast(value.object.get("ly").?.integer);
         self.lyc = @intCast(value.object.get("lyc").?.integer);
         self.wly = @intCast(value.object.get("wly").?.integer);
+        self.wy = @intCast(value.object.get("wy").?.integer);
+        self.wx = @intCast(value.object.get("wx").?.integer);
+        self.opri = value.object.get("opri").?.bool;
+
+        self.hdma5 = @intCast(value.object.get("hdma5").?.integer);
+        self.hdmas = @intCast(value.object.get("hdmas").?.integer);
+        self.hdmad = @intCast(value.object.get("hdmad").?.integer);
+
         self.bgp = @intCast(value.object.get("bgp").?.integer);
         self.obp0 = @intCast(value.object.get("obp0").?.integer);
         self.obp1 = @intCast(value.object.get("obp1").?.integer);
-        self.wy = @intCast(value.object.get("wy").?.integer);
-        self.wx = @intCast(value.object.get("wx").?.integer);
-        self.dmg_mode = value.object.get("dmg_mode").?.bool;
-        self.opri = value.object.get("opri").?.bool;
-        self.vbk = @intCast(value.object.get("vbk").?.integer);
-        self.hdma5 = @intCast(value.object.get("hdma5").?.integer);
-        self.hdmad = @intCast(value.object.get("hdmad").?.integer);
-        self.hdmas = @intCast(value.object.get("hdmas").?.integer);
-        self.hdma_cpu_cycles = @intCast(value.object.get("hdma_cpu_cycles").?.integer);
         self.bcps = @intCast(value.object.get("bcps").?.integer);
         self.ocps = @intCast(value.object.get("ocps").?.integer);
+
+        self.stat_blocking = value.object.get("stat_blocking").?.bool;
+        self.stat_irq_delay = @intCast(value.object.get("stat_irq_delay").?.integer);
+        self.stat_irq = @intCast(value.object.get("stat_irq").?.integer);
+
         self.mode = @intCast(value.object.get("mode").?.integer);
         self.mode3_length = @intCast(value.object.get("mode3_length").?.integer);
         self.cycle_counter = @intCast(value.object.get("cycle_counter").?.integer);
-        self.irq_counter = @intCast(value.object.get("irq_counter").?.integer);
-        self.stat_irq = @intCast(value.object.get("stat_irq").?.integer);
     }
 };
