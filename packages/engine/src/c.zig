@@ -4,6 +4,9 @@ const builtin = @import("builtin");
 pub usingnamespace @cImport({
     @cInclude("raylib.h");
     @cInclude("blip_buf.h");
+    if (builtin.os.tag == .emscripten) {
+        @cInclude("emscripten/html5.h");
+    }
 });
 
 pub const Event = enum(u32) {

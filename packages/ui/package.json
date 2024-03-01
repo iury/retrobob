@@ -1,7 +1,6 @@
 {
   "name": "retrobob",
   "private": true,
-  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +14,7 @@
     "@mantine/notifications": "^7.6.1",
     "@tabler/icons-react": "^2.47.0",
     "engine": "workspace:*",
-    "jotai": "^2.6.5",
+    "jotai": "^2.7.0",
     "postcss": "^8.4.35",
     "postcss-preset-mantine": "^1.13.0",
     "postcss-simple-vars": "^7.0.1",
@@ -24,7 +23,7 @@
     "vite-plugin-markdown": "^2.2.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.60",
+    "@types/react": "^18.2.61",
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react-swc": "^3.6.0",
     "eslint": "^8.57.0",

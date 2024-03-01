@@ -44,7 +44,7 @@ export const State = { IDLE: 1, PLAYING: 2, PAUSED: 3 }
 export const Region = { NTSC: 1, PAL: 2 }
 export const Ratio = { NATIVE: 1, NTSC: 2, PAL: 3, STANDARD: 4, WIDESCREEN: 5 }
 
-export const audioCtxAtom = atom(new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 }))
+export const audioCtxAtom = atom(new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 }))
 export const audioWorkletAtom = atom(null)
 export const engineAtom = atom(null)
 export const overlayAtom = atom(false)

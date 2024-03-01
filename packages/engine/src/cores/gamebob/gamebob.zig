@@ -249,13 +249,13 @@ pub const Gamebob = struct {
 
         var file: std.fs.File = undefined;
         if (builtin.os.tag == .emscripten) {
-            const path = try std.fmt.allocPrintZ(allocator, "/data/gb_{X}.st{d}", .{ self.cartridge.crc, slot });
+            const version = std.os.getenv("VERSION") orelse ".";
+            const path = try std.fmt.allocPrintZ(allocator, "/data/{s}/gb_{X}.st{d}", .{ version, self.cartridge.crc, slot });
             file = try std.fs.createFileAbsoluteZ(path, .{});
         } else {
             const path = try std.fmt.allocPrintZ(allocator, "gb_{X}.st{d}", .{ self.cartridge.crc, slot });
             file = try std.fs.cwd().createFileZ(path, .{});
         }
-
         defer file.close();
 
         var compressor = try std.compress.zlib.compressor(file.writer(), .{ .level = .fast });
@@ -285,7 +285,8 @@ pub const Gamebob = struct {
 
         var file: std.fs.File = undefined;
         if (builtin.os.tag == .emscripten) {
-            const path = try std.fmt.allocPrintZ(allocator, "/data/gb_{X}.st{d}", .{ self.cartridge.crc, slot });
+            const version = std.os.getenv("VERSION") orelse ".";
+            const path = try std.fmt.allocPrintZ(allocator, "/data/{s}/gb_{X}.st{d}", .{ version, self.cartridge.crc, slot });
             file = std.fs.openFileAbsoluteZ(path, .{}) catch return false;
         } else {
             const path = try std.fmt.allocPrintZ(allocator, "gb_{X}.st{d}", .{ self.cartridge.crc, slot });
@@ -322,20 +323,20 @@ pub const Gamebob = struct {
     }
 
     pub fn fillAudioBuffer(ctx: *anyopaque, buffer: []f32) usize {
-        var mixer_buffer: [1600]i16 = [_]i16{0} ** 1600;
+        var mixer_buffer: [1470]i16 = [_]i16{0} ** 1470;
         const self: *@This() = @ptrCast(@alignCast(ctx));
 
         const left_buf = @as(*c.struct_blip_t, @ptrCast(@alignCast(self.apu.left_buf)));
         const right_buf = @as(*c.struct_blip_t, @ptrCast(@alignCast(self.apu.right_buf)));
 
-        _ = c.blip_read_samples(left_buf, &mixer_buffer, 800, 1);
-        _ = c.blip_read_samples(right_buf, &mixer_buffer[1], 800, 1);
+        _ = c.blip_read_samples(left_buf, &mixer_buffer, 735, 1);
+        _ = c.blip_read_samples(right_buf, &mixer_buffer[1], 735, 1);
 
         for (0..mixer_buffer.len) |i| {
             buffer[i] = @as(f32, @floatFromInt(mixer_buffer[i])) / 32768.0;
         }
 
-        return 800;
+        return 735;
     }
 
     pub fn render(ctx: *anyopaque) void {

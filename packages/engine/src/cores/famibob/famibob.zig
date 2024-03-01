@@ -222,13 +222,13 @@ pub const Famibob = struct {
 
         var file: std.fs.File = undefined;
         if (builtin.os.tag == .emscripten) {
-            const path = try std.fmt.allocPrintZ(allocator, "/data/nes_{X}.st{d}", .{ self.cartridge.crc, slot });
+            const version = std.os.getenv("VERSION") orelse ".";
+            const path = try std.fmt.allocPrintZ(allocator, "/data/{s}/nes_{X}.st{d}", .{ version, self.cartridge.crc, slot });
             file = try std.fs.createFileAbsoluteZ(path, .{});
         } else {
             const path = try std.fmt.allocPrintZ(allocator, "nes_{X}.st{d}", .{ self.cartridge.crc, slot });
             file = try std.fs.cwd().createFileZ(path, .{});
         }
-
         defer file.close();
 
         var compressor = try std.compress.zlib.compressor(file.writer(), .{ .level = .fast });
@@ -258,13 +258,13 @@ pub const Famibob = struct {
 
         var file: std.fs.File = undefined;
         if (builtin.os.tag == .emscripten) {
-            const path = try std.fmt.allocPrintZ(allocator, "/data/nes_{X}.st{d}", .{ self.cartridge.crc, slot });
+            const version = std.os.getenv("VERSION") orelse ".";
+            const path = try std.fmt.allocPrintZ(allocator, "/data/{s}/nes_{X}.st{d}", .{ version, self.cartridge.crc, slot });
             file = std.fs.openFileAbsoluteZ(path, .{}) catch return false;
         } else {
             const path = try std.fmt.allocPrintZ(allocator, "nes_{X}.st{d}", .{ self.cartridge.crc, slot });
             file = std.fs.cwd().openFileZ(path, .{}) catch return false;
         }
-
         defer file.close();
 
         var decompressor = std.compress.zlib.decompressor(file.reader());
@@ -300,7 +300,7 @@ pub const Famibob = struct {
         self.apu.setRegion(region);
     }
 
-    var mixer_buffer: [1920]i16 = [_]i16{0} ** 1920;
+    var mixer_buffer: [1764]i16 = [_]i16{0} ** 1764;
     pub fn fillAudioBuffer(ctx: *anyopaque, buffer: []f32) usize {
         const self: *@This() = @ptrCast(@alignCast(ctx));
 

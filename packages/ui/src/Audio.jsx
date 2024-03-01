@@ -13,7 +13,7 @@ export function Audio() {
   useEffect(() => {
     if (engine && audioWorklet && region) {
       engine._performAction(Action.CHANGE_REGION, region, 0)
-      audioWorklet.setSampleSize(region == Region.NTSC ? 800 : 960)
+      audioWorklet.setSampleSize(region == Region.NTSC ? 735 : 882)
     }
   }, [engine, audioWorklet, region])
 

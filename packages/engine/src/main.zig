@@ -6,8 +6,19 @@ const Core = @import("cores/core.zig");
 const Famibob = @import("cores/famibob/famibob.zig").Famibob;
 const Gamebob = @import("cores/gamebob/gamebob.zig").Gamebob;
 
-pub const ActiveCore = enum(u8) { unknown = 0, famibob = 1, gamebob = 2 };
-const Ratio = enum(u8) { native = 1, ntsc = 2, pal = 3, standard = 4, widescreen = 5 };
+pub const ActiveCore = enum(u8) {
+    unknown = 0,
+    famibob = 1,
+    gamebob = 2,
+};
+
+const Ratio = enum(u8) {
+    native = 1,
+    ntsc = 2,
+    pal = 3,
+    standard = 4,
+    widescreen = 5,
+};
 
 const Action = enum(i32) {
     load_core = 1,
@@ -31,7 +42,7 @@ var active_core: ActiveCore = .unknown;
 var slot: u8 = 1;
 
 var audio_stream: ?c.AudioStream = null;
-var audio_buffer: [3840]f32 = [_]f32{0} ** 3840;
+var audio_buffer: [1764]f32 = [_]f32{0} ** 1764;
 
 var ratio: Ratio = .native;
 var zoom: f32 = 3;
@@ -61,7 +72,8 @@ fn loadROM(data: []const u8) bool {
             core = famibob.core();
             resizeScreen();
 
-            audio_stream = c.LoadAudioStream(48000, 32, 2);
+            c.SetAudioStreamBufferSizeDefault(735);
+            audio_stream = c.LoadAudioStream(44100, 32, 2);
             c.PlayAudioStream(audio_stream.?);
 
             c.notifyEvent(.region_support, 1);
@@ -91,8 +103,8 @@ fn loadROM(data: []const u8) bool {
             core = gamebob.core();
             resizeScreen();
 
-            c.SetAudioStreamBufferSizeDefault(800);
-            audio_stream = c.LoadAudioStream(48000, 32, 2);
+            c.SetAudioStreamBufferSizeDefault(735);
+            audio_stream = c.LoadAudioStream(44100, 32, 2);
             c.PlayAudioStream(audio_stream.?);
 
             setFPS(60);
@@ -227,15 +239,15 @@ export fn performAction(action: Action, param: u32, ptr: [*c]const u8) void {
 
                     if (region == .ntsc) {
                         setFPS(60);
-                        c.SetAudioStreamBufferSizeDefault(800);
+                        c.SetAudioStreamBufferSizeDefault(735);
                         performAction(.change_ratio, @intFromEnum(Ratio.ntsc), 0);
                     } else {
                         setFPS(50);
-                        c.SetAudioStreamBufferSizeDefault(960);
+                        c.SetAudioStreamBufferSizeDefault(882);
                         performAction(.change_ratio, @intFromEnum(Ratio.pal), 0);
                     }
 
-                    audio_stream = c.LoadAudioStream(48000, 32, 2);
+                    audio_stream = c.LoadAudioStream(44100, 32, 2);
                     c.PlayAudioStream(audio_stream.?);
                 }
                 c.notifyEvent(.region_changed, param);
@@ -313,10 +325,13 @@ fn handleFileDropped() void {
         }
     } else if (std.mem.endsWith(u8, lower_path, ".gb") or std.mem.endsWith(u8, lower_path, ".gbc")) {
         performAction(.load_core, @intFromEnum(ActiveCore.gamebob), 0);
+
         const file = std.fs.openFileAbsoluteZ(files.paths[0], .{}) catch return;
         defer file.close();
+
         const buf = file.readToEndAlloc(alloc, @truncate(file.getEndPos() catch 0)) catch return;
         defer alloc.free(buf);
+
         performAction(.load_game, @truncate(buf.len), buf.ptr);
     } else {
         performAction(.unload_core, 0, null);
@@ -324,7 +339,7 @@ fn handleFileDropped() void {
     }
 }
 
-fn mainLoop() callconv(.C) void {
+fn mainLoop() void {
     if (c.IsFileDropped()) {
         handleFileDropped();
     }
@@ -468,18 +483,22 @@ fn resizeScreen() void {
 }
 
 fn setFPS(fps: c_int) void {
-    c.SetTargetFPS(fps);
+    if (builtin.os.tag == .emscripten) {
+        fps_interval = 1000.0 / @as(f64, @floatFromInt(fps));
+    } else {
+        c.SetTargetFPS(fps);
+    }
 }
 
 fn updateAudioStream() void {
     if (core) |*cr| {
         if (audio_stream) |s| {
             if (c.IsAudioStreamPlaying(s)) {
-                const sample_size: usize = if (cr.region == .ntsc) 800 else 960;
+                const sample_size: usize = if (cr.region == .ntsc) 735 else 882;
                 if (builtin.os.tag == .emscripten) {
-                    _ = cr.fillAudioBuffer(audio_buffer[0 .. sample_size * 4]);
+                    _ = cr.fillAudioBuffer(audio_buffer[0 .. sample_size * 2]);
                 } else {
-                    const samples = cr.fillAudioBuffer(audio_buffer[0 .. sample_size * 4]);
+                    const samples = cr.fillAudioBuffer(audio_buffer[0 .. sample_size * 2]);
                     if (c.IsAudioStreamProcessed(s)) {
                         c.UpdateAudioStream(s, &audio_buffer, @intCast(samples));
                     }
@@ -491,6 +510,17 @@ fn updateAudioStream() void {
     }
 }
 
+var fps_then: f64 = 0;
+var fps_delta: f64 = 0;
+var fps_interval: f64 = 1000.0 / 60.0;
+fn fpsLimiter() callconv(.C) void {
+    const now = c.emscripten_performance_now();
+    if (now - fps_then < fps_interval - fps_delta) return;
+    fps_delta = @min(fps_interval, fps_delta + now - fps_then - fps_interval);
+    fps_then = now;
+    mainLoop();
+}
+
 pub fn main() void {
     c.InitWindow(768, 720, "retrobob");
     c.InitAudioDevice();
@@ -498,8 +528,9 @@ pub fn main() void {
     setFPS(60);
 
     if (builtin.os.tag == .emscripten) {
+        fps_then = c.emscripten_performance_now();
         std.os.emscripten.emscripten_cancel_main_loop();
-        std.os.emscripten.emscripten_set_main_loop(mainLoop, 0, 1);
+        std.os.emscripten.emscripten_set_main_loop(fpsLimiter, 0, 1);
     } else {
         while (!c.WindowShouldClose()) {
             mainLoop();

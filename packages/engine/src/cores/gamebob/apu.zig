@@ -178,10 +178,10 @@ pub const APU = struct {
     ch4_out: u4 = 0,
 
     pub fn init(allocator: std.mem.Allocator) !*APU {
-        const left_buf = c.blip_new(800) orelse return error.BlipError;
-        const right_buf = c.blip_new(800) orelse return error.BlipError;
-        c.blip_set_rates(left_buf, 4213440, 48000);
-        c.blip_set_rates(right_buf, 4213440, 48000);
+        const left_buf = c.blip_new(735) orelse return error.BlipError;
+        const right_buf = c.blip_new(735) orelse return error.BlipError;
+        c.blip_set_rates(left_buf, 4213440, 44100);
+        c.blip_set_rates(right_buf, 4213440, 44100);
 
         const instance = try allocator.create(APU);
         instance.* = .{
@@ -415,14 +415,14 @@ pub const APU = struct {
     }
 
     fn mixer(self: *APU) void {
-        var ch1_left_out: f64 = 1;
-        var ch1_right_out: f64 = 1;
-        var ch2_left_out: f64 = 1;
-        var ch2_right_out: f64 = 1;
-        var ch3_left_out: f64 = 1;
-        var ch3_right_out: f64 = 1;
-        var ch4_left_out: f64 = 1;
-        var ch4_right_out: f64 = 1;
+        var ch1_left_out: f64 = 0;
+        var ch1_right_out: f64 = 0;
+        var ch2_left_out: f64 = 0;
+        var ch2_right_out: f64 = 0;
+        var ch3_left_out: f64 = 0;
+        var ch3_right_out: f64 = 0;
+        var ch4_left_out: f64 = 0;
+        var ch4_right_out: f64 = 0;
 
         if (self.ctrl.ch1_on) {
             if (self.panning.ch1_left) ch1_left_out = -std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch1_out)) / 15);
@@ -444,10 +444,10 @@ pub const APU = struct {
             if (self.panning.ch4_right) ch4_right_out = -std.math.lerp(-1.0, 1.0, @as(f64, @floatFromInt(self.ch4_out)) / 15);
         }
 
-        var left_out: f64 = (ch1_left_out + ch2_left_out + ch3_left_out + ch4_left_out) / 4.0 * 0.6;
-        var right_out: f64 = (ch1_right_out + ch2_right_out + ch3_right_out + ch4_right_out) / 4.0 * 0.6;
-        left_out *= @as(f64, @floatFromInt(@as(u4, self.volume.left) + 1)) / 8.0;
-        right_out *= @as(f64, @floatFromInt(@as(u4, self.volume.right) + 1)) / 8.0;
+        var left_out: f64 = (ch1_left_out + ch2_left_out + ch3_left_out + ch4_left_out) / 4.0;
+        var right_out: f64 = (ch1_right_out + ch2_right_out + ch3_right_out + ch4_right_out) / 4.0;
+        left_out *= @as(f64, @floatFromInt(@as(u4, self.volume.left) + 1)) / 32.0;
+        right_out *= @as(f64, @floatFromInt(@as(u4, self.volume.right) + 1)) / 32.0;
         const left: i32 = @intFromFloat(std.math.lerp(@as(f64, @floatFromInt(std.math.minInt(i16))), @as(f64, @floatFromInt(std.math.maxInt(i16))), (left_out + 1) / 2));
         const right: i32 = @intFromFloat(std.math.lerp(@as(f64, @floatFromInt(std.math.minInt(i16))), @as(f64, @floatFromInt(std.math.maxInt(i16))), (right_out + 1) / 2));
 

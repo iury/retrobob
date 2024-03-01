@@ -9,7 +9,7 @@ export class MyAudioWorklet extends AudioWorkletNode {
     this.sharedBarrier = new SharedArrayBuffer(2 * 4)
     this.barrier = new Int32Array(this.sharedBarrier)
 
-    this.setSampleSize(800)
+    this.setSampleSize(735)
   }
 
   fill() {

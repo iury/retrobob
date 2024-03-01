@@ -14,7 +14,7 @@ const blip_t = extern struct {
 
 pub const Mixer = struct {
     pub const cycle_length: u32 = 10000;
-    pub const max_sample_rate: u32 = 48000;
+    pub const max_sample_rate: u32 = 44100;
     pub const max_samples_per_frame = max_sample_rate / 50;
 
     allocator: std.mem.Allocator,
