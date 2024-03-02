@@ -1,5 +1,6 @@
 const std = @import("std");
 const APU = @import("apu.zig").APU;
+const c = @import("../../../c.zig");
 
 pub const FrameCounter = struct {
     pub const FrameType = enum { none, quarter_frame, half_frame };
@@ -97,35 +98,35 @@ pub const FrameCounter = struct {
         self.block_tick = 0;
     }
 
-    pub fn jsonStringify(self: *const FrameCounter, jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("irq_requested");
-        try jw.write(self.irq_requested);
-        try jw.objectField("previous_cycle");
-        try jw.write(self.previous_cycle);
-        try jw.objectField("current_step");
-        try jw.write(self.current_step);
-        try jw.objectField("step_mode");
-        try jw.write(self.step_mode);
-        try jw.objectField("inhibit_irq");
-        try jw.write(self.inhibit_irq);
-        try jw.objectField("block_tick");
-        try jw.write(self.block_tick);
-        try jw.objectField("new_value");
-        try jw.write(self.new_value);
-        try jw.objectField("write_delay_counter");
-        try jw.write(self.write_delay_counter);
-        try jw.endObject();
+    pub fn serialize(self: *const FrameCounter, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+        c.mpack_write_cstr(pack, "irq_requested");
+        c.mpack_write_bool(pack, self.irq_requested);
+        c.mpack_write_cstr(pack, "previous_cycle");
+        c.mpack_write_i32(pack, self.previous_cycle);
+        c.mpack_write_cstr(pack, "current_step");
+        c.mpack_write_u32(pack, self.current_step);
+        c.mpack_write_cstr(pack, "step_mode");
+        c.mpack_write_u32(pack, self.step_mode);
+        c.mpack_write_cstr(pack, "inhibit_irq");
+        c.mpack_write_bool(pack, self.inhibit_irq);
+        c.mpack_write_cstr(pack, "block_tick");
+        c.mpack_write_u8(pack, self.block_tick);
+        c.mpack_write_cstr(pack, "new_value");
+        c.mpack_write_i16(pack, self.new_value);
+        c.mpack_write_cstr(pack, "write_delay_counter");
+        c.mpack_write_i8(pack, self.write_delay_counter);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *FrameCounter, value: std.json.Value) void {
-        self.irq_requested = value.object.get("irq_requested").?.bool;
-        self.previous_cycle = @intCast(value.object.get("previous_cycle").?.integer);
-        self.current_step = @intCast(value.object.get("current_step").?.integer);
-        self.step_mode = @intCast(value.object.get("step_mode").?.integer);
-        self.inhibit_irq = value.object.get("inhibit_irq").?.bool;
-        self.block_tick = @intCast(value.object.get("block_tick").?.integer);
-        self.new_value = @intCast(value.object.get("new_value").?.integer);
-        self.write_delay_counter = @intCast(value.object.get("write_delay_counter").?.integer);
+    pub fn deserialize(self: *FrameCounter, pack: c.mpack_node_t) void {
+        self.irq_requested = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "irq_requested"));
+        self.previous_cycle = c.mpack_node_i32(c.mpack_node_map_cstr(pack, "previous_cycle"));
+        self.current_step = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "current_step"));
+        self.step_mode = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "step_mode"));
+        self.inhibit_irq = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "inhibit_irq"));
+        self.block_tick = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "block_tick"));
+        self.new_value = c.mpack_node_i16(c.mpack_node_map_cstr(pack, "new_value"));
+        self.write_delay_counter = c.mpack_node_i8(c.mpack_node_map_cstr(pack, "write_delay_counter"));
     }
 };

@@ -117,20 +117,14 @@ pub const Input = struct {
         };
     }
 
-    pub fn jsonStringify(self: *const @This(), jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("p1");
-        try jw.write(self.p1);
-        try jw.endObject();
+    pub fn serialize(self: *const Input, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+        c.mpack_write_cstr(pack, "p1");
+        c.mpack_write_u8(pack, @bitCast(self.p1));
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *Input, value: std.json.Value) void {
-        const p1 = value.object.get("p1").?;
-        self.p1.a_right = p1.object.get("a_right").?.bool;
-        self.p1.b_left = p1.object.get("b_left").?.bool;
-        self.p1.select_up = p1.object.get("select_up").?.bool;
-        self.p1.start_down = p1.object.get("start_down").?.bool;
-        self.p1.dpad = p1.object.get("dpad").?.bool;
-        self.p1.button = p1.object.get("button").?.bool;
+    pub fn deserialize(self: *Input, pack: c.mpack_node_t) void {
+        self.p1 = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "p1")));
     }
 };

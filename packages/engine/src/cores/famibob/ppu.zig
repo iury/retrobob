@@ -1,6 +1,7 @@
 const std = @import("std");
 const Region = @import("../core.zig").Region;
 const Memory = @import("../../memory.zig").Memory;
+const c = @import("../../c.zig");
 
 const COLOR_PALETTE = [_]u32{
     0xFF666666, 0xFF882A00, 0xFFA71214, 0xFFA4003B,
@@ -21,7 +22,7 @@ const COLOR_PALETTE = [_]u32{
     0xFFF2EBB5, 0xFFB8B8B8, 0xFF000000, 0xFF000000,
 };
 
-const PPUCTRL = struct {
+const PPUCTRL = packed struct {
     // base nametable address (00: 0x2000; 01: 0x2400; 10: 0x2800; 11: 0x2C00)
     nametable_select: u2 = 0,
     // VRAM address increment per CPU read/write of PPUDATA
@@ -40,7 +41,7 @@ const PPUCTRL = struct {
     nmi: bool = false,
 };
 
-const PPUMASK = struct {
+const PPUMASK = packed struct {
     // grayscale (0: normal color, 1: grayscale)
     grayscale: bool = false,
     // 1: show background in leftmost 8 pixels of screen, 0: hide
@@ -59,7 +60,7 @@ const PPUMASK = struct {
     intensify_blue: bool = false,
 };
 
-const PPUSCROLL = struct {
+const PPUSCROLL = packed struct {
     // during rendering, specifies the starting coarse-x scroll for the next
     // scanline and the starting y scroll for the screen.
     // otherwise holds the scroll or address before transferring it to v */
@@ -72,7 +73,7 @@ const PPUSCROLL = struct {
     w: bool = false,
 };
 
-const PPUSTATUS = struct {
+const PPUSTATUS = packed struct {
     // vblank has started (0: not in vblank; 1: in vblank)
     // set at dot 1 of line 241; cleared after reading $2002
     // and at dot 1 of the prerender line. */
@@ -804,6 +805,214 @@ pub const PPU = struct {
         self.booting = 0;
     }
 
+    pub fn serialize(self: *const PPU, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+
+        c.mpack_write_cstr(pack, "oamdata");
+        c.mpack_start_bin(pack, @intCast(self.oamdata.len));
+        c.mpack_write_bytes(pack, &self.oamdata, self.oamdata.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_write_cstr(pack, "palette");
+        c.mpack_start_bin(pack, @intCast(self.palette.len));
+        c.mpack_write_bytes(pack, &self.palette, self.palette.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_write_cstr(pack, "bgtile");
+        c.mpack_start_bin(pack, @intCast(self.bgtile.len));
+        c.mpack_write_bytes(pack, &self.bgtile, self.bgtile.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_write_cstr(pack, "bgattr");
+        c.mpack_start_bin(pack, @intCast(self.bgattr.len));
+        c.mpack_write_bytes(pack, &self.bgattr, self.bgattr.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_write_cstr(pack, "pattern");
+        c.mpack_build_array(pack);
+        for (self.pattern) |item| c.mpack_write_u16(pack, item);
+        c.mpack_complete_array(pack);
+
+        c.mpack_write_cstr(pack, "secondary_oamdata");
+        c.mpack_start_bin(pack, @intCast(self.secondary_oamdata.len));
+        c.mpack_write_bytes(pack, &self.secondary_oamdata, self.secondary_oamdata.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_write_cstr(pack, "sprite_tiles");
+        c.mpack_build_array(pack);
+        for (self.sprite_tiles) |sprite| {
+            c.mpack_build_map(pack);
+            c.mpack_write_cstr(pack, "sprite_x");
+            c.mpack_write_u8(pack, sprite.sprite_x);
+            c.mpack_write_cstr(pack, "pattern");
+            c.mpack_build_array(pack);
+            for (sprite.pattern) |item| c.mpack_write_u8(pack, item);
+            c.mpack_complete_array(pack);
+            c.mpack_write_cstr(pack, "palette_offset");
+            c.mpack_write_u8(pack, sprite.palette_offset);
+            c.mpack_write_cstr(pack, "bg_priority");
+            c.mpack_write_bool(pack, sprite.bg_priority);
+            c.mpack_write_cstr(pack, "flip_h");
+            c.mpack_write_bool(pack, sprite.flip_h);
+            c.mpack_complete_map(pack);
+        }
+        c.mpack_complete_array(pack);
+
+        c.mpack_write_cstr(pack, "has_sprite");
+        c.mpack_build_array(pack);
+        for (self.has_sprite) |item| c.mpack_write_bool(pack, item);
+        c.mpack_complete_array(pack);
+
+        c.mpack_write_cstr(pack, "ctrl");
+        c.mpack_write_u8(pack, @bitCast(self.ctrl));
+        c.mpack_write_cstr(pack, "mask");
+        c.mpack_write_u8(pack, @bitCast(self.mask));
+        c.mpack_write_cstr(pack, "status");
+        c.mpack_write_u8(pack, @as(u3, @bitCast(self.status)));
+        c.mpack_write_cstr(pack, "oamaddr");
+        c.mpack_write_u8(pack, self.oamaddr);
+        c.mpack_write_cstr(pack, "scroll");
+        c.mpack_write_u32(pack, @as(u25, @bitCast(self.scroll)));
+        c.mpack_write_cstr(pack, "ppuaddr");
+        c.mpack_write_u16(pack, self.ppuaddr);
+        c.mpack_write_cstr(pack, "ppudata");
+        c.mpack_write_u8(pack, self.ppudata);
+        c.mpack_write_cstr(pack, "bgtileaddr");
+        c.mpack_write_u16(pack, self.bgtileaddr);
+        c.mpack_write_cstr(pack, "bgnextattr");
+        c.mpack_write_u8(pack, self.bgnextattr);
+        c.mpack_write_cstr(pack, "secondary_oamaddr");
+        c.mpack_write_u8(pack, self.secondary_oamaddr);
+        c.mpack_write_cstr(pack, "oambuffer");
+        c.mpack_write_u8(pack, self.oambuffer);
+        c.mpack_write_cstr(pack, "sprite_cnt");
+        c.mpack_write_u8(pack, self.sprite_cnt);
+        c.mpack_write_cstr(pack, "sprite_idx");
+        c.mpack_write_u8(pack, self.sprite_idx);
+        c.mpack_write_cstr(pack, "sprite0_visible");
+        c.mpack_write_bool(pack, self.sprite0_visible);
+        c.mpack_write_cstr(pack, "sprite0_added");
+        c.mpack_write_bool(pack, self.sprite0_added);
+        c.mpack_write_cstr(pack, "sprite_in_range");
+        c.mpack_write_bool(pack, self.sprite_in_range);
+        c.mpack_write_cstr(pack, "copy_finished");
+        c.mpack_write_bool(pack, self.copy_finished);
+        c.mpack_write_cstr(pack, "overflow_cnt");
+        c.mpack_write_u8(pack, self.overflow_cnt);
+        c.mpack_write_cstr(pack, "sprite_addr_h");
+        c.mpack_write_u8(pack, self.sprite_addr_h);
+        c.mpack_write_cstr(pack, "sprite_addr_l");
+        c.mpack_write_u8(pack, self.sprite_addr_l);
+        c.mpack_write_cstr(pack, "openbus");
+        c.mpack_write_u8(pack, self.openbus);
+        c.mpack_write_cstr(pack, "odd_frame");
+        c.mpack_write_bool(pack, self.odd_frame);
+        c.mpack_write_cstr(pack, "buffer");
+        c.mpack_write_u8(pack, self.buffer);
+        c.mpack_write_cstr(pack, "dot");
+        c.mpack_write_u16(pack, self.dot);
+        c.mpack_write_cstr(pack, "scanline");
+        c.mpack_write_i32(pack, self.scanline);
+        c.mpack_write_cstr(pack, "vblank_line");
+        c.mpack_write_u16(pack, self.vblank_line);
+        c.mpack_write_cstr(pack, "prerender_line");
+        c.mpack_write_u16(pack, self.prerender_line);
+        c.mpack_write_cstr(pack, "rendering");
+        c.mpack_write_bool(pack, self.rendering);
+        c.mpack_write_cstr(pack, "nmi_requested");
+        c.mpack_write_bool(pack, self.nmi_requested);
+
+        c.mpack_write_cstr(pack, "oam_dma");
+        if (self.oam_dma) |dma| {
+            c.mpack_write_u16(pack, dma);
+        } else {
+            c.mpack_write_nil(pack);
+        }
+
+        c.mpack_write_cstr(pack, "booting");
+        if (self.booting) |booting| {
+            c.mpack_write_u32(pack, booting);
+        } else {
+            c.mpack_write_nil(pack);
+        }
+
+        c.mpack_complete_map(pack);
+    }
+
+    pub fn deserialize(self: *PPU, pack: c.mpack_node_t) void {
+        @memset(&self.oamdata, 0);
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "oamdata"), &self.oamdata, self.oamdata.len);
+
+        @memset(&self.palette, 0);
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "palette"), &self.palette, self.palette.len);
+
+        @memset(&self.bgtile, 0);
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "bgtile"), &self.bgtile, self.bgtile.len);
+
+        @memset(&self.bgattr, 0);
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "bgattr"), &self.bgattr, self.bgattr.len);
+
+        @memset(&self.secondary_oamdata, 0);
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "secondary_oamdata"), &self.secondary_oamdata, self.secondary_oamdata.len);
+
+        const pattern = c.mpack_node_array_length(c.mpack_node_map_cstr(pack, "pattern"));
+        for (0..pattern) |i| self.pattern[i] = c.mpack_node_u16(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "pattern"), i));
+
+        const sprite_tiles = c.mpack_node_array_length(c.mpack_node_map_cstr(pack, "sprite_tiles"));
+        for (0..sprite_tiles) |i| {
+            const sprite = c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "sprite_tiles"), i);
+            const p = c.mpack_node_array_length(c.mpack_node_map_cstr(sprite, "pattern"));
+            for (0..p) |j| self.sprite_tiles[i].pattern[j] = c.mpack_node_u8(c.mpack_node_array_at(c.mpack_node_map_cstr(sprite, "pattern"), j));
+            self.sprite_tiles[i].sprite_x = c.mpack_node_u8(c.mpack_node_map_cstr(sprite, "sprite_x"));
+            self.sprite_tiles[i].palette_offset = c.mpack_node_u8(c.mpack_node_map_cstr(sprite, "palette_offset"));
+            self.sprite_tiles[i].bg_priority = c.mpack_node_bool(c.mpack_node_map_cstr(sprite, "bg_priority"));
+            self.sprite_tiles[i].flip_h = c.mpack_node_bool(c.mpack_node_map_cstr(sprite, "flip_h"));
+        }
+
+        const has_sprite = c.mpack_node_array_length(c.mpack_node_map_cstr(pack, "has_sprite"));
+        for (0..has_sprite) |i| self.has_sprite[i] = c.mpack_node_bool(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "has_sprite"), i));
+
+        self.ctrl = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ctrl")));
+        self.mask = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "mask")));
+        self.status = @bitCast(@as(u3, @truncate(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "status")))));
+        self.oamaddr = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "oamaddr"));
+        self.scroll = @bitCast(@as(u25, @truncate(c.mpack_node_u32(c.mpack_node_map_cstr(pack, "scroll")))));
+        self.ppuaddr = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ppuaddr"));
+        self.ppudata = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ppudata"));
+        self.bgtileaddr = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "bgtileaddr"));
+        self.bgnextattr = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "bgnextattr"));
+        self.secondary_oamaddr = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "secondary_oamaddr"));
+        self.oambuffer = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "oambuffer"));
+        self.sprite_cnt = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "sprite_cnt"));
+        self.sprite_idx = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "sprite_idx"));
+        self.sprite0_visible = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "sprite0_visible"));
+        self.sprite0_added = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "sprite0_added"));
+        self.sprite_in_range = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "sprite_in_range"));
+        self.copy_finished = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "copy_finished"));
+        self.overflow_cnt = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "overflow_cnt"));
+        self.sprite_addr_h = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "sprite_addr_h"));
+        self.sprite_addr_l = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "sprite_addr_l"));
+        self.openbus = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "openbus"));
+        self.odd_frame = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "odd_frame"));
+        self.buffer = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "buffer"));
+        self.dot = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "dot"));
+        self.scanline = c.mpack_node_i32(c.mpack_node_map_cstr(pack, "scanline"));
+        self.vblank_line = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "vblank_line"));
+        self.prerender_line = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "prerender_line"));
+        self.rendering = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "rendering"));
+        self.nmi_requested = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "nmi_requested"));
+
+        self.oam_dma = switch (c.mpack_node_type(c.mpack_node_map_cstr(pack, "oam_dma"))) {
+            c.mpack_type_uint => c.mpack_node_u16(c.mpack_node_map_cstr(pack, "oam_dma")),
+            else => null,
+        };
+
+        self.booting = switch (c.mpack_node_type(c.mpack_node_map_cstr(pack, "booting"))) {
+            c.mpack_type_uint => c.mpack_node_u32(c.mpack_node_map_cstr(pack, "booting")),
+            else => null,
+        };
+    }
+
     pub fn memory(self: *PPU) Memory(u16, u8) {
         return .{
             .ptr = self,
@@ -812,205 +1021,6 @@ pub const PPU = struct {
                 .write = write,
                 .deinit = deinitMemory,
             },
-        };
-    }
-
-    pub fn jsonStringify(self: *const PPU, jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("ctrl");
-        try jw.write(self.ctrl);
-        try jw.objectField("mask");
-        try jw.write(self.mask);
-        try jw.objectField("status");
-        try jw.write(self.status);
-        try jw.objectField("oamaddr");
-        try jw.write(self.oamaddr);
-        try jw.objectField("oamdata");
-        try jw.write(self.oamdata);
-        try jw.objectField("scroll");
-        try jw.write(self.scroll);
-        try jw.objectField("ppuaddr");
-        try jw.write(self.ppuaddr);
-        try jw.objectField("ppudata");
-        try jw.write(self.ppudata);
-        try jw.objectField("palette");
-        try jw.write(self.palette);
-        try jw.objectField("bgtile");
-        try jw.write(self.bgtile);
-        try jw.objectField("bgattr");
-        try jw.write(self.bgattr);
-        try jw.objectField("pattern");
-        try jw.write(self.pattern);
-        try jw.objectField("bgtileaddr");
-        try jw.write(self.bgtileaddr);
-        try jw.objectField("bgnextattr");
-        try jw.write(self.bgnextattr);
-        try jw.objectField("secondary_oamdata");
-        try jw.write(self.secondary_oamdata);
-        try jw.objectField("secondary_oamaddr");
-        try jw.write(self.secondary_oamaddr);
-        try jw.objectField("oambuffer");
-        try jw.write(self.oambuffer);
-        try jw.objectField("sprite_cnt");
-        try jw.write(self.sprite_cnt);
-        try jw.objectField("sprite_idx");
-        try jw.write(self.sprite_idx);
-        try jw.objectField("sprite0_visible");
-        try jw.write(self.sprite0_visible);
-        try jw.objectField("sprite_tiles");
-        try jw.write(self.sprite_tiles);
-        try jw.objectField("has_sprite");
-        try jw.write(self.has_sprite);
-        try jw.objectField("sprite0_added");
-        try jw.write(self.sprite0_added);
-        try jw.objectField("sprite_in_range");
-        try jw.write(self.sprite_in_range);
-        try jw.objectField("copy_finished");
-        try jw.write(self.copy_finished);
-        try jw.objectField("overflow_cnt");
-        try jw.write(self.overflow_cnt);
-        try jw.objectField("sprite_addr_h");
-        try jw.write(self.sprite_addr_h);
-        try jw.objectField("sprite_addr_l");
-        try jw.write(self.sprite_addr_l);
-        try jw.objectField("openbus");
-        try jw.write(self.openbus);
-        try jw.objectField("odd_frame");
-        try jw.write(self.odd_frame);
-        try jw.objectField("buffer");
-        try jw.write(self.buffer);
-        try jw.objectField("dot");
-        try jw.write(self.dot);
-        try jw.objectField("scanline");
-        try jw.write(self.scanline);
-        try jw.objectField("vblank_line");
-        try jw.write(self.vblank_line);
-        try jw.objectField("prerender_line");
-        try jw.write(self.prerender_line);
-        try jw.objectField("rendering");
-        try jw.write(self.rendering);
-        try jw.objectField("nmi_requested");
-        try jw.write(self.nmi_requested);
-        try jw.objectField("oam_dma");
-        try jw.write(self.oam_dma);
-        try jw.objectField("booting");
-        try jw.write(self.booting);
-        try jw.endObject();
-    }
-
-    pub fn jsonParse(self: *PPU, value: std.json.Value) void {
-        @memset(&self.oamdata, 0);
-        for (value.object.get("oamdata").?.array.items, 0..) |v, i| {
-            self.oamdata[i] = @intCast(v.integer);
-        }
-
-        @memset(&self.palette, 0);
-        for (value.object.get("palette").?.array.items, 0..) |v, i| {
-            self.palette[i] = @intCast(v.integer);
-        }
-
-        @memset(&self.bgtile, 0);
-        for (value.object.get("bgtile").?.array.items, 0..) |v, i| {
-            self.bgtile[i] = @intCast(v.integer);
-        }
-
-        @memset(&self.bgattr, 0);
-        for (value.object.get("bgattr").?.array.items, 0..) |v, i| {
-            self.bgattr[i] = @intCast(v.integer);
-        }
-
-        @memset(&self.pattern, 0);
-        for (value.object.get("pattern").?.array.items, 0..) |v, i| {
-            self.pattern[i] = @intCast(v.integer);
-        }
-
-        @memset(&self.secondary_oamdata, 0);
-        for (value.object.get("secondary_oamdata").?.array.items, 0..) |v, i| {
-            self.secondary_oamdata[i] = @intCast(v.integer);
-        }
-
-        @memset(&self.has_sprite, false);
-        for (value.object.get("has_sprite").?.array.items, 0..) |v, i| {
-            self.has_sprite[i] = v.bool;
-        }
-
-        @memset(&self.sprite_tiles, .{});
-        for (value.object.get("sprite_tiles").?.array.items, 0..) |v, i| {
-            var tile = &self.sprite_tiles[i];
-            const j = v.object;
-            tile.bg_priority = j.get("bg_priority").?.bool;
-            tile.flip_h = j.get("flip_h").?.bool;
-            tile.palette_offset = @intCast(j.get("palette_offset").?.integer);
-            tile.sprite_x = @intCast(j.get("sprite_x").?.integer);
-            @memset(&tile.pattern, 0);
-            for (j.get("pattern").?.array.items, 0..) |p, k| {
-                tile.pattern[k] = @intCast(p.integer);
-            }
-        }
-
-        const ctrl = value.object.get("ctrl").?.object;
-        self.ctrl.nametable_select = @intCast(ctrl.get("nametable_select").?.integer);
-        self.ctrl.increment_mode = ctrl.get("increment_mode").?.bool;
-        self.ctrl.sprite_select = ctrl.get("sprite_select").?.bool;
-        self.ctrl.background_select = ctrl.get("background_select").?.bool;
-        self.ctrl.large_sprites = ctrl.get("large_sprites").?.bool;
-        self.ctrl.is_master = ctrl.get("is_master").?.bool;
-        self.ctrl.nmi = ctrl.get("nmi").?.bool;
-
-        const mask = value.object.get("mask").?.object;
-        self.mask.grayscale = mask.get("grayscale").?.bool;
-        self.mask.leftmost_background = mask.get("leftmost_background").?.bool;
-        self.mask.leftmost_sprites = mask.get("leftmost_sprites").?.bool;
-        self.mask.show_background = mask.get("show_background").?.bool;
-        self.mask.show_sprites = mask.get("show_sprites").?.bool;
-        self.mask.intensify_red = mask.get("intensify_red").?.bool;
-        self.mask.intensify_green = mask.get("intensify_green").?.bool;
-        self.mask.intensify_blue = mask.get("intensify_blue").?.bool;
-
-        const status = value.object.get("status").?.object;
-        self.status.vblank = status.get("vblank").?.bool;
-        self.status.sprite0_hit = status.get("sprite0_hit").?.bool;
-        self.status.overflow = status.get("overflow").?.bool;
-
-        const scroll = value.object.get("scroll").?.object;
-        self.scroll.t = @intCast(scroll.get("t").?.integer);
-        self.scroll.x = @intCast(scroll.get("x").?.integer);
-        self.scroll.w = scroll.get("w").?.bool;
-
-        self.oamaddr = @intCast(value.object.get("oamaddr").?.integer);
-        self.ppuaddr = @intCast(value.object.get("ppuaddr").?.integer);
-        self.ppudata = @intCast(value.object.get("ppudata").?.integer);
-        self.bgtileaddr = @intCast(value.object.get("bgtileaddr").?.integer);
-        self.bgnextattr = @intCast(value.object.get("bgnextattr").?.integer);
-        self.secondary_oamaddr = @intCast(value.object.get("secondary_oamaddr").?.integer);
-        self.oambuffer = @intCast(value.object.get("oambuffer").?.integer);
-        self.sprite_cnt = @intCast(value.object.get("sprite_cnt").?.integer);
-        self.sprite_idx = @intCast(value.object.get("sprite_idx").?.integer);
-        self.sprite0_visible = value.object.get("sprite0_visible").?.bool;
-        self.sprite0_added = value.object.get("sprite0_added").?.bool;
-        self.sprite_in_range = value.object.get("sprite_in_range").?.bool;
-        self.copy_finished = value.object.get("copy_finished").?.bool;
-        self.overflow_cnt = @intCast(value.object.get("overflow_cnt").?.integer);
-        self.sprite_addr_h = @intCast(value.object.get("sprite_addr_h").?.integer);
-        self.sprite_addr_l = @intCast(value.object.get("sprite_addr_l").?.integer);
-        self.openbus = @intCast(value.object.get("openbus").?.integer);
-        self.odd_frame = value.object.get("odd_frame").?.bool;
-        self.buffer = @intCast(value.object.get("buffer").?.integer);
-        self.dot = @intCast(value.object.get("dot").?.integer);
-        self.scanline = @intCast(value.object.get("scanline").?.integer);
-        self.vblank_line = @intCast(value.object.get("vblank_line").?.integer);
-        self.prerender_line = @intCast(value.object.get("prerender_line").?.integer);
-        self.rendering = value.object.get("rendering").?.bool;
-        self.nmi_requested = value.object.get("nmi_requested").?.bool;
-
-        self.oam_dma = switch (value.object.get("oam_dma").?) {
-            .integer => |v| @intCast(v),
-            else => null,
-        };
-
-        self.booting = switch (value.object.get("booting").?) {
-            .integer => |v| @intCast(v),
-            else => null,
         };
     }
 };

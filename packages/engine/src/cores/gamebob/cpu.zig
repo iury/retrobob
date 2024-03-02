@@ -2,6 +2,7 @@ const std = @import("std");
 const IO = @import("io.zig").IO;
 const Memory = @import("../../memory.zig").Memory;
 const Proxy = @import("../../proxy.zig").Proxy;
+const cz = @import("../../c.zig");
 
 // see https://gb-archive.github.io/salvage/decoding_gbz80_opcodes/Decoding%20Gamboy%20Z80%20Opcodes.html
 // to make sense of the labels and LUTs
@@ -1609,91 +1610,41 @@ pub const CPU = struct {
         self.hl = @bitCast(@as(u16, 0x000d));
     }
 
-    pub fn jsonStringify(self: *const @This(), jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("cycle_counter");
-        try jw.write(self.cycle_counter);
-        try jw.objectField("mode");
-        try jw.write(self.mode);
-        try jw.objectField("pc");
-        try jw.write(self.pc);
-        try jw.objectField("sp");
-        try jw.write(self.sp);
-        try jw.objectField("ime");
-        try jw.write(self.ime);
-        try jw.objectField("ei_pending");
-        try jw.write(self.ei_pending);
-
-        try jw.objectField("af");
-        try jw.beginObject();
-        try jw.objectField("a");
-        try jw.write(self.af.a);
-        try jw.objectField("f");
-        try jw.beginObject();
-        try jw.objectField("c");
-        try jw.write(self.af.f.c);
-        try jw.objectField("h");
-        try jw.write(self.af.f.h);
-        try jw.objectField("n");
-        try jw.write(self.af.f.n);
-        try jw.objectField("z");
-        try jw.write(self.af.f.z);
-        try jw.endObject();
-        try jw.endObject();
-
-        try jw.objectField("bc");
-        try jw.beginObject();
-        try jw.objectField("b");
-        try jw.write(self.bc.b);
-        try jw.objectField("c");
-        try jw.write(self.bc.c);
-        try jw.endObject();
-
-        try jw.objectField("de");
-        try jw.beginObject();
-        try jw.objectField("d");
-        try jw.write(self.de.d);
-        try jw.objectField("e");
-        try jw.write(self.de.e);
-        try jw.endObject();
-
-        try jw.objectField("hl");
-        try jw.beginObject();
-        try jw.objectField("h");
-        try jw.write(self.hl.h);
-        try jw.objectField("l");
-        try jw.write(self.hl.l);
-        try jw.endObject();
-
-        try jw.endObject();
+    pub fn serialize(self: *const @This(), pack: *cz.mpack_writer_t) void {
+        cz.mpack_build_map(pack);
+        cz.mpack_write_cstr(pack, "cycle_counter");
+        cz.mpack_write_u16(pack, self.cycle_counter);
+        cz.mpack_write_cstr(pack, "mode");
+        cz.mpack_write_u8(pack, @intFromEnum(self.mode));
+        cz.mpack_write_cstr(pack, "pc");
+        cz.mpack_write_u16(pack, self.pc);
+        cz.mpack_write_cstr(pack, "sp");
+        cz.mpack_write_u16(pack, self.sp);
+        cz.mpack_write_cstr(pack, "ime");
+        cz.mpack_write_bool(pack, self.ime);
+        cz.mpack_write_cstr(pack, "ei_pending");
+        cz.mpack_write_bool(pack, self.ei_pending);
+        cz.mpack_write_cstr(pack, "af");
+        cz.mpack_write_u16(pack, @as(u16, @bitCast(self.af)));
+        cz.mpack_write_cstr(pack, "bc");
+        cz.mpack_write_u16(pack, @as(u16, @bitCast(self.bc)));
+        cz.mpack_write_cstr(pack, "de");
+        cz.mpack_write_u16(pack, @as(u16, @bitCast(self.de)));
+        cz.mpack_write_cstr(pack, "hl");
+        cz.mpack_write_u16(pack, @as(u16, @bitCast(self.hl)));
+        cz.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *CPU, value: std.json.Value) void {
-        self.cycle_counter = @intCast(value.object.get("cycle_counter").?.integer);
-        self.mode = std.meta.stringToEnum(@TypeOf(self.mode), value.object.get("mode").?.string).?;
-        self.pc = @intCast(value.object.get("pc").?.integer);
-        self.sp = @intCast(value.object.get("sp").?.integer);
-        self.ime = value.object.get("ime").?.bool;
-        self.ei_pending = value.object.get("ei_pending").?.bool;
-
-        const af = value.object.get("af").?;
-        self.af.a = @intCast(af.object.get("a").?.integer);
-        const f = af.object.get("f").?;
-        self.af.f.c = f.object.get("c").?.bool;
-        self.af.f.h = f.object.get("h").?.bool;
-        self.af.f.n = f.object.get("n").?.bool;
-        self.af.f.z = f.object.get("z").?.bool;
-
-        const bc = value.object.get("bc").?;
-        self.bc.b = @intCast(bc.object.get("b").?.integer);
-        self.bc.c = @intCast(bc.object.get("c").?.integer);
-
-        const de = value.object.get("de").?;
-        self.de.d = @intCast(de.object.get("d").?.integer);
-        self.de.e = @intCast(de.object.get("e").?.integer);
-
-        const hl = value.object.get("hl").?;
-        self.hl.h = @intCast(hl.object.get("h").?.integer);
-        self.hl.l = @intCast(hl.object.get("l").?.integer);
+    pub fn deserialize(self: *CPU, pack: cz.mpack_node_t) void {
+        self.mode = @enumFromInt(cz.mpack_node_u8(cz.mpack_node_map_cstr(pack, "mode")));
+        self.cycle_counter = cz.mpack_node_u16(cz.mpack_node_map_cstr(pack, "cycle_counter"));
+        self.pc = cz.mpack_node_u16(cz.mpack_node_map_cstr(pack, "pc"));
+        self.sp = cz.mpack_node_u16(cz.mpack_node_map_cstr(pack, "sp"));
+        self.ime = cz.mpack_node_bool(cz.mpack_node_map_cstr(pack, "ime"));
+        self.ei_pending = cz.mpack_node_bool(cz.mpack_node_map_cstr(pack, "ei_pending"));
+        self.af = @bitCast(cz.mpack_node_u16(cz.mpack_node_map_cstr(pack, "af")));
+        self.bc = @bitCast(cz.mpack_node_u16(cz.mpack_node_map_cstr(pack, "bc")));
+        self.de = @bitCast(cz.mpack_node_u16(cz.mpack_node_map_cstr(pack, "de")));
+        self.hl = @bitCast(cz.mpack_node_u16(cz.mpack_node_map_cstr(pack, "hl")));
     }
 };

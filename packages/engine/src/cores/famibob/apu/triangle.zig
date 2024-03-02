@@ -2,6 +2,7 @@ const std = @import("std");
 const APU = @import("apu.zig");
 const LengthCounter = APU.LengthCounter;
 const Timer = APU.Timer;
+const c = @import("../../../c.zig");
 
 pub const Triangle = struct {
     const sequence: []const i8 = &[_]i8{
@@ -69,32 +70,32 @@ pub const Triangle = struct {
         self.sequence_position = 0;
     }
 
-    pub fn jsonStringify(self: *const Triangle, jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("length_counter");
-        try jw.write(self.length_counter);
-        try jw.objectField("timer");
-        try jw.write(self.timer);
-        try jw.objectField("linear_counter");
-        try jw.write(self.linear_counter);
-        try jw.objectField("linear_counter_reload");
-        try jw.write(self.linear_counter_reload);
-        try jw.objectField("linear_reload_flag");
-        try jw.write(self.linear_reload_flag);
-        try jw.objectField("linear_control_flag");
-        try jw.write(self.linear_control_flag);
-        try jw.objectField("sequence_position");
-        try jw.write(self.sequence_position);
-        try jw.endObject();
+    pub fn serialize(self: *const Triangle, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+        c.mpack_write_cstr(pack, "length_counter");
+        self.length_counter.serialize(pack);
+        c.mpack_write_cstr(pack, "timer");
+        self.timer.serialize(pack);
+        c.mpack_write_cstr(pack, "linear_counter");
+        c.mpack_write_u8(pack, self.linear_counter);
+        c.mpack_write_cstr(pack, "linear_counter_reload");
+        c.mpack_write_u8(pack, self.linear_counter_reload);
+        c.mpack_write_cstr(pack, "linear_reload_flag");
+        c.mpack_write_bool(pack, self.linear_reload_flag);
+        c.mpack_write_cstr(pack, "linear_control_flag");
+        c.mpack_write_bool(pack, self.linear_control_flag);
+        c.mpack_write_cstr(pack, "sequence_position");
+        c.mpack_write_u8(pack, self.sequence_position);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *Triangle, value: std.json.Value) void {
-        self.length_counter.jsonParse(value.object.get("length_counter").?);
-        self.timer.jsonParse(value.object.get("timer").?);
-        self.linear_counter = @intCast(value.object.get("linear_counter").?.integer);
-        self.linear_counter_reload = @intCast(value.object.get("linear_counter_reload").?.integer);
-        self.linear_reload_flag = value.object.get("linear_reload_flag").?.bool;
-        self.linear_control_flag = value.object.get("linear_control_flag").?.bool;
-        self.sequence_position = @intCast(value.object.get("sequence_position").?.integer);
+    pub fn deserialize(self: *Triangle, pack: c.mpack_node_t) void {
+        self.length_counter.deserialize(c.mpack_node_map_cstr(pack, "length_counter"));
+        self.timer.deserialize(c.mpack_node_map_cstr(pack, "timer"));
+        self.linear_counter = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "linear_counter"));
+        self.linear_counter_reload = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "linear_counter_reload"));
+        self.linear_reload_flag = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "linear_reload_flag"));
+        self.linear_control_flag = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "linear_control_flag"));
+        self.sequence_position = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "sequence_position"));
     }
 };

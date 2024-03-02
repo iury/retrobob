@@ -1,5 +1,6 @@
 const std = @import("std");
 const Region = @import("../core.zig").Region;
+const c = @import("../../c.zig");
 
 pub const RunOption = enum { frame, cpu_cycle, ppu_cycle };
 
@@ -88,18 +89,18 @@ pub fn Clock(comptime T: anytype, comptime region: Region) type {
             }
         }
 
-        pub fn jsonStringify(self: *const @This(), jw: anytype) !void {
-            try jw.beginObject();
-            try jw.objectField("cpu_counter");
-            try jw.write(self.cpu_counter);
-            try jw.objectField("ppu_counter");
-            try jw.write(self.ppu_counter);
-            try jw.endObject();
+        pub fn serialize(self: *const Self, pack: *c.mpack_writer_t) void {
+            c.mpack_build_map(pack);
+            c.mpack_write_cstr(pack, "cpu_counter");
+            c.mpack_write_u32(pack, self.cpu_counter);
+            c.mpack_write_cstr(pack, "ppu_counter");
+            c.mpack_write_u32(pack, self.ppu_counter);
+            c.mpack_complete_map(pack);
         }
 
-        pub fn jsonParse(self: *Self, value: std.json.Value) void {
-            self.cpu_counter = @intCast(value.object.get("cpu_counter").?.integer);
-            self.ppu_counter = @intCast(value.object.get("ppu_counter").?.integer);
+        pub fn deserialize(self: *Self, pack: c.mpack_node_t) void {
+            self.cpu_counter = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "cpu_counter"));
+            self.ppu_counter = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "ppu_counter"));
         }
     };
 }

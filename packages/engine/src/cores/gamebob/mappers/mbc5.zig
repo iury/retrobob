@@ -1,6 +1,7 @@
 const std = @import("std");
 const Cartridge = @import("../cartridge.zig").Cartridge;
 const Memory = @import("../../../memory.zig").Memory;
+const c = @import("../../../c.zig");
 
 pub const MBC5 = struct {
     allocator: std.mem.Allocator,
@@ -91,27 +92,34 @@ pub const MBC5 = struct {
         }
     }
 
-    fn jsonParse(ctx: *anyopaque, value: std.json.Value) void {
+    fn serialize(ctx: *const anyopaque, pack: *c.mpack_writer_t) void {
+        const self: *const @This() = @ptrCast(@alignCast(ctx));
+        c.mpack_build_map(pack);
+
+        c.mpack_write_cstr(pack, "ram");
+        c.mpack_start_bin(pack, @intCast(self.ram.len));
+        c.mpack_write_bytes(pack, self.ram.ptr, self.ram.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_write_cstr(pack, "ram_enable");
+        c.mpack_write_bool(pack, self.ram_enable);
+        c.mpack_write_cstr(pack, "rom_bank");
+        c.mpack_write_u16(pack, self.rom_bank);
+        c.mpack_write_cstr(pack, "ram_bank");
+        c.mpack_write_u8(pack, self.ram_bank);
+
+        c.mpack_complete_map(pack);
+    }
+
+    fn deserialize(ctx: *anyopaque, pack: c.mpack_node_t) void {
         const self: *@This() = @ptrCast(@alignCast(ctx));
 
         @memset(self.ram, 0);
-        for (value.object.get("ram").?.array.items, 0..) |v, i| {
-            self.ram[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "ram"), self.ram.ptr, self.ram.len);
 
-        self.ram_enable = value.object.get("ram_enable").?.bool;
-        self.rom_bank = @intCast(value.object.get("rom_bank").?.integer);
-        self.ram_bank = @intCast(value.object.get("ram_bank").?.integer);
-    }
-
-    fn jsonStringify(ctx: *anyopaque, allocator: std.mem.Allocator) !std.json.Value {
-        const self: *@This() = @ptrCast(@alignCast(ctx));
-        var data = std.json.ObjectMap.init(allocator);
-        try data.put("ram", .{ .string = self.ram });
-        try data.put("ram_enable", .{ .bool = self.ram_enable });
-        try data.put("rom_bank", .{ .integer = self.rom_bank });
-        try data.put("ram_bank", .{ .integer = self.ram_bank });
-        return .{ .object = data };
+        self.ram_enable = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "ram_enable"));
+        self.rom_bank = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "rom_bank"));
+        self.ram_bank = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ram_bank"));
     }
 
     pub fn memory(self: *@This()) Memory(u16, u8) {
@@ -121,8 +129,8 @@ pub const MBC5 = struct {
                 .read = read,
                 .write = write,
                 .deinit = deinitMemory,
-                .jsonParse = jsonParse,
-                .jsonStringify = jsonStringify,
+                .serialize = serialize,
+                .deserialize = deserialize,
             },
         };
     }

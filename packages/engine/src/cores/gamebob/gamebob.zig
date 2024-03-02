@@ -260,17 +260,43 @@ pub const Gamebob = struct {
         var compressor = try std.compress.zlib.compressor(file.writer(), .{ .level = .fast });
         const writer = compressor.writer();
 
-        try std.json.stringify(.{
-            .version = 1,
-            .cpu = &self.cpu,
-            .ppu = self.ppu,
-            .apu = self.apu,
-            .input = self.input,
-            .timer = self.timer,
-            .clock = &self.clock,
-            .bus = try MemoryBus.jsonStringify(self.bus, allocator),
-            .mapper = try self.mapper.jsonStringify(allocator),
-        }, .{ .emit_strings_as_arrays = true }, writer);
+        var pack: c.mpack_writer_t = undefined;
+        var data: [*c]u8 = undefined;
+        var size: usize = undefined;
+        c.mpack_writer_init_growable(&pack, &data, &size);
+        c.mpack_build_map(&pack);
+
+        c.mpack_write_cstr(&pack, "version");
+        c.mpack_write_int(&pack, 1);
+
+        c.mpack_write_cstr(&pack, "cpu");
+        self.cpu.serialize(&pack);
+
+        c.mpack_write_cstr(&pack, "ppu");
+        self.ppu.serialize(&pack);
+
+        c.mpack_write_cstr(&pack, "apu");
+        self.apu.serialize(&pack);
+
+        c.mpack_write_cstr(&pack, "input");
+        self.input.serialize(&pack);
+
+        c.mpack_write_cstr(&pack, "timer");
+        self.timer.serialize(&pack);
+
+        c.mpack_write_cstr(&pack, "clock");
+        self.clock.serialize(&pack);
+
+        c.mpack_write_cstr(&pack, "bus");
+        self.bus.serialize(&pack);
+
+        c.mpack_write_cstr(&pack, "mapper");
+        self.mapper.serialize(&pack);
+
+        c.mpack_complete_map(&pack);
+        if (c.mpack_writer_destroy(&pack) != c.mpack_ok) return error.MPack;
+        try writer.writeAll(data[0..size]);
+        std.c.free(data);
 
         try compressor.finish();
     }
@@ -294,18 +320,22 @@ pub const Gamebob = struct {
 
         var decompressor = std.compress.zlib.decompressor(file.reader());
         const reader = decompressor.reader();
-        var json_reader = std.json.Reader(1024, @TypeOf(reader)).init(allocator, reader);
-        var data = try std.json.parseFromTokenSourceLeaky(std.json.Value, allocator, &json_reader, .{});
+        const data = try reader.readAllAlloc(allocator, std.math.maxInt(usize));
 
-        if (data.object.get("version").?.integer == 1) {
-            self.cpu.jsonParse(data.object.get("cpu").?);
-            self.apu.jsonParse(data.object.get("apu").?);
-            self.input.jsonParse(data.object.get("input").?);
-            self.timer.jsonParse(data.object.get("timer").?);
-            self.clock.jsonParse(data.object.get("clock").?);
-            self.bus.jsonParse(data.object.get("bus").?);
-            self.mapper.jsonParse(data.object.get("mapper").?);
-            self.ppu.jsonParse(data.object.get("ppu").?);
+        var pack: c.mpack_tree_t = undefined;
+        c.mpack_tree_init_data(&pack, data.ptr, data.len);
+        defer if (c.mpack_tree_destroy(&pack) != c.mpack_ok) std.debug.print("mpack error\n", .{});
+        c.mpack_tree_parse(&pack);
+        const root = c.mpack_tree_root(&pack);
+        if (c.mpack_node_int(c.mpack_node_map_cstr(root, "version")) == 1) {
+            self.cpu.deserialize(c.mpack_node_map_cstr(root, "cpu"));
+            self.ppu.deserialize(c.mpack_node_map_cstr(root, "ppu"));
+            self.apu.deserialize(c.mpack_node_map_cstr(root, "apu"));
+            self.input.deserialize(c.mpack_node_map_cstr(root, "input"));
+            self.timer.deserialize(c.mpack_node_map_cstr(root, "timer"));
+            self.clock.deserialize(c.mpack_node_map_cstr(root, "clock"));
+            self.bus.deserialize(c.mpack_node_map_cstr(root, "bus"));
+            self.mapper.deserialize(c.mpack_node_map_cstr(root, "mapper"));
         } else return false;
 
         return true;

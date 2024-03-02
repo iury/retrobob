@@ -14,6 +14,7 @@ const std = @import("std");
 const Mirroring = @import("../famibob.zig").Mirroring;
 const Cartridge = @import("../cartridge.zig").Cartridge;
 const Memory = @import("../../../memory.zig").Memory;
+const c = @import("../../../c.zig");
 
 pub const UxROM = struct {
     allocator: std.mem.Allocator,
@@ -108,41 +109,43 @@ pub const UxROM = struct {
         }
     }
 
-    fn jsonParse(ctx: *anyopaque, value: std.json.Value) void {
+    fn serialize(ctx: *const anyopaque, pack: *c.mpack_writer_t) void {
+        const self: *const @This() = @ptrCast(@alignCast(ctx));
+        c.mpack_build_map(pack);
+
+        c.mpack_write_cstr(pack, "vram");
+        c.mpack_start_bin(pack, @intCast(self.vram.len));
+        c.mpack_write_bytes(pack, self.vram.ptr, self.vram.len);
+        c.mpack_finish_bin(pack);
+
+        if (self.chr_ram) |chr| {
+            c.mpack_write_cstr(pack, "chr_ram");
+            c.mpack_start_bin(pack, @intCast(chr.len));
+            c.mpack_write_bytes(pack, chr.ptr, chr.len);
+            c.mpack_finish_bin(pack);
+        }
+
+        c.mpack_write_cstr(pack, "mirroring");
+        c.mpack_write_u8(pack, @intFromEnum(self.mirroring));
+        c.mpack_write_cstr(pack, "bank");
+        c.mpack_write_u32(pack, @truncate(self.bank));
+
+        c.mpack_complete_map(pack);
+    }
+
+    fn deserialize(ctx: *anyopaque, pack: c.mpack_node_t) void {
         const self: *@This() = @ptrCast(@alignCast(ctx));
 
         @memset(self.vram, 0);
-        for (value.object.get("vram").?.array.items, 0..) |v, i| {
-            self.vram[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "vram"), self.vram.ptr, self.vram.len);
 
         if (self.chr_ram) |chr| {
             @memset(chr, 0);
-            for (value.object.get("chr_ram").?.array.items, 0..) |v, i| {
-                chr[i] = @intCast(v.integer);
-            }
+            _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "chr_ram"), chr.ptr, chr.len);
         }
 
-        self.mirroring = @enumFromInt(value.object.get("mirroring").?.integer);
-        self.bank = @intCast(value.object.get("bank").?.integer);
-    }
-
-    fn jsonStringify(ctx: *anyopaque, allocator: std.mem.Allocator) !std.json.Value {
-        const self: *@This() = @ptrCast(@alignCast(ctx));
-        var data = std.json.ObjectMap.init(allocator);
-
-        try data.put("mirroring", .{ .integer = @intFromEnum(self.mirroring) });
-        try data.put("vram", .{ .string = self.vram });
-
-        try data.put("bank", .{ .integer = @as(i64, @intCast(self.bank)) });
-
-        if (self.chr_ram) |arr| {
-            try data.put("chr_ram", .{ .string = arr });
-        } else {
-            try data.put("chr_ram", .null);
-        }
-
-        return .{ .object = data };
+        self.mirroring = @enumFromInt(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "mirroring")));
+        self.bank = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "bank"));
     }
 
     pub fn memory(self: *@This()) Memory(u16, u8) {
@@ -152,8 +155,8 @@ pub const UxROM = struct {
                 .read = read,
                 .write = write,
                 .deinit = deinitMemory,
-                .jsonParse = jsonParse,
-                .jsonStringify = jsonStringify,
+                .serialize = serialize,
+                .deserialize = deserialize,
             },
         };
     }

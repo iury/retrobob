@@ -2,8 +2,9 @@ const std = @import("std");
 const Cartridge = @import("../cartridge.zig").Cartridge;
 const Memory = @import("../../../memory.zig").Memory;
 const RTC = @import("rtc.zig").RTC;
+const c = @import("../../../c.zig");
 
-const RTCData = struct {
+const RTCData = packed struct {
     subseconds: u16 = 0,
     seconds: u8 = 0,
     minutes: u8 = 0,
@@ -161,65 +162,43 @@ pub const MBC3 = struct {
         }
     }
 
-    fn jsonParse(ctx: *anyopaque, value: std.json.Value) void {
+    fn serialize(ctx: *const anyopaque, pack: *c.mpack_writer_t) void {
+        const self: *const @This() = @ptrCast(@alignCast(ctx));
+        c.mpack_build_map(pack);
+
+        c.mpack_write_cstr(pack, "ram");
+        c.mpack_start_bin(pack, @intCast(self.ram.len));
+        c.mpack_write_bytes(pack, self.ram.ptr, self.ram.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_write_cstr(pack, "ram_enable");
+        c.mpack_write_bool(pack, self.ram_enable);
+        c.mpack_write_cstr(pack, "rom_bank");
+        c.mpack_write_u8(pack, self.rom_bank);
+        c.mpack_write_cstr(pack, "ram_bank");
+        c.mpack_write_u8(pack, self.ram_bank);
+        c.mpack_write_cstr(pack, "latch");
+        c.mpack_write_u8(pack, self.latch);
+        c.mpack_write_cstr(pack, "rtc_latch");
+        c.mpack_write_u64(pack, @bitCast(self.rtc_latch));
+        c.mpack_write_cstr(pack, "rtc_data");
+        c.mpack_write_u64(pack, @bitCast(self.rtc_data));
+
+        c.mpack_complete_map(pack);
+    }
+
+    fn deserialize(ctx: *anyopaque, pack: c.mpack_node_t) void {
         const self: *@This() = @ptrCast(@alignCast(ctx));
 
         @memset(self.ram, 0);
-        for (value.object.get("ram").?.array.items, 0..) |v, i| {
-            self.ram[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "ram"), self.ram.ptr, self.ram.len);
 
-        self.ram_enable = value.object.get("ram_enable").?.bool;
-        self.rom_bank = @intCast(value.object.get("rom_bank").?.integer);
-        self.ram_bank = @intCast(value.object.get("ram_bank").?.integer);
-        self.latch = @intCast(value.object.get("latch").?.integer);
-
-        const rtc_data = value.object.get("rtc_data").?.object;
-        self.rtc_data.subseconds = @intCast(rtc_data.get("subseconds").?.integer);
-        self.rtc_data.seconds = @intCast(rtc_data.get("seconds").?.integer);
-        self.rtc_data.minutes = @intCast(rtc_data.get("minutes").?.integer);
-        self.rtc_data.hours = @intCast(rtc_data.get("hours").?.integer);
-        self.rtc_data.day = @intCast(rtc_data.get("day").?.integer);
-        self.rtc_data.dh = @intCast(rtc_data.get("dh").?.integer);
-
-        const rtc_latch = value.object.get("rtc_latch").?.object;
-        self.rtc_latch.subseconds = @intCast(rtc_latch.get("subseconds").?.integer);
-        self.rtc_latch.seconds = @intCast(rtc_latch.get("seconds").?.integer);
-        self.rtc_latch.minutes = @intCast(rtc_latch.get("minutes").?.integer);
-        self.rtc_latch.hours = @intCast(rtc_latch.get("hours").?.integer);
-        self.rtc_latch.day = @intCast(rtc_latch.get("day").?.integer);
-        self.rtc_latch.dh = @intCast(rtc_latch.get("dh").?.integer);
-    }
-
-    fn jsonStringify(ctx: *anyopaque, allocator: std.mem.Allocator) !std.json.Value {
-        const self: *@This() = @ptrCast(@alignCast(ctx));
-        var data = std.json.ObjectMap.init(allocator);
-
-        try data.put("ram", .{ .string = self.ram });
-        try data.put("ram_enable", .{ .bool = self.ram_enable });
-        try data.put("rom_bank", .{ .integer = self.rom_bank });
-        try data.put("ram_bank", .{ .integer = self.ram_bank });
-        try data.put("latch", .{ .integer = self.ram_bank });
-
-        var rtc_data = std.json.ObjectMap.init(allocator);
-        try rtc_data.put("subseconds", .{ .integer = self.rtc_data.subseconds });
-        try rtc_data.put("seconds", .{ .integer = self.rtc_data.seconds });
-        try rtc_data.put("minutes", .{ .integer = self.rtc_data.minutes });
-        try rtc_data.put("hours", .{ .integer = self.rtc_data.hours });
-        try rtc_data.put("day", .{ .integer = self.rtc_data.day });
-        try rtc_data.put("dh", .{ .integer = self.rtc_data.dh });
-        try data.put("rtc_data", .{ .object = rtc_data });
-
-        var rtc_latch = std.json.ObjectMap.init(allocator);
-        try rtc_latch.put("subseconds", .{ .integer = self.rtc_latch.subseconds });
-        try rtc_latch.put("seconds", .{ .integer = self.rtc_latch.seconds });
-        try rtc_latch.put("minutes", .{ .integer = self.rtc_latch.minutes });
-        try rtc_latch.put("hours", .{ .integer = self.rtc_latch.hours });
-        try rtc_latch.put("day", .{ .integer = self.rtc_latch.day });
-        try rtc_latch.put("dh", .{ .integer = self.rtc_latch.dh });
-        try data.put("rtc_latch", .{ .object = rtc_latch });
-
-        return .{ .object = data };
+        self.ram_enable = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "ram_enable"));
+        self.rom_bank = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "rom_bank"));
+        self.ram_bank = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ram_bank"));
+        self.latch = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "latch"));
+        self.rtc_latch = @bitCast(c.mpack_node_u64(c.mpack_node_map_cstr(pack, "rtc_latch")));
+        self.rtc_data = @bitCast(c.mpack_node_u64(c.mpack_node_map_cstr(pack, "rtc_data")));
     }
 
     pub fn memory(self: *@This()) Memory(u16, u8) {
@@ -229,8 +208,8 @@ pub const MBC3 = struct {
                 .read = read,
                 .write = write,
                 .deinit = deinitMemory,
-                .jsonParse = jsonParse,
-                .jsonStringify = jsonStringify,
+                .serialize = serialize,
+                .deserialize = deserialize,
             },
         };
     }

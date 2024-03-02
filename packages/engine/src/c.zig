@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 pub usingnamespace @cImport({
+    @cInclude("mpack.h");
     @cInclude("raylib.h");
     @cInclude("blip_buf.h");
     if (builtin.os.tag == .emscripten) {

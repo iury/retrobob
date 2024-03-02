@@ -139,7 +139,7 @@ export const Engine = forwardRef(function Engine(props, ref) {
         } else {
           interval = setInterval(() => {
             engine._performAction(Action.PERSIST_BATTERY, 0, 0)
-          }, 30000)
+          }, 15000)
         }
       })
     }

@@ -1,6 +1,7 @@
 const std = @import("std");
 const IO = @import("io.zig").IO;
 const Memory = @import("../../memory.zig").Memory;
+const c = @import("../../c.zig");
 
 pub const MemoryBus = struct {
     allocator: std.mem.Allocator,
@@ -235,33 +236,42 @@ pub const MemoryBus = struct {
         @memset(self.hiram, 0xff);
     }
 
-    pub fn jsonStringify(ctx: *anyopaque, allocator: std.mem.Allocator) !std.json.Value {
-        const self: *@This() = @ptrCast(@alignCast(ctx));
-        var data = std.json.ObjectMap.init(allocator);
-        try data.put("ie", .{ .integer = self.ie });
-        try data.put("svbk", .{ .integer = self.svbk });
-        try data.put("iflags", .{ .integer = self.iflags });
-        try data.put("key1", .{ .integer = self.key1 });
-        try data.put("hiram", .{ .string = self.hiram });
-        try data.put("wram", .{ .string = self.wram });
-        return .{ .object = data };
+    pub fn serialize(self: *const MemoryBus, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+
+        c.mpack_write_cstr(pack, "ie");
+        c.mpack_write_u8(pack, self.ie);
+        c.mpack_write_cstr(pack, "svbk");
+        c.mpack_write_u8(pack, self.svbk);
+        c.mpack_write_cstr(pack, "iflags");
+        c.mpack_write_u8(pack, self.iflags);
+        c.mpack_write_cstr(pack, "key1");
+        c.mpack_write_u8(pack, self.key1);
+
+        c.mpack_write_cstr(pack, "hiram");
+        c.mpack_start_bin(pack, @intCast(self.hiram.len));
+        c.mpack_write_bytes(pack, self.hiram.ptr, self.hiram.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_write_cstr(pack, "wram");
+        c.mpack_start_bin(pack, @intCast(self.wram.len));
+        c.mpack_write_bytes(pack, self.wram.ptr, self.wram.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *MemoryBus, value: std.json.Value) void {
+    pub fn deserialize(self: *MemoryBus, pack: c.mpack_node_t) void {
         @memset(self.hiram, 0);
-        for (value.object.get("hiram").?.array.items, 0..) |v, i| {
-            self.hiram[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "hiram"), self.hiram.ptr, self.hiram.len);
 
         @memset(self.wram, 0);
-        for (value.object.get("wram").?.array.items, 0..) |v, i| {
-            self.wram[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "wram"), self.wram.ptr, self.wram.len);
 
-        self.ie = @intCast(value.object.get("ie").?.integer);
-        self.svbk = @intCast(value.object.get("svbk").?.integer);
-        self.iflags = @intCast(value.object.get("iflags").?.integer);
-        self.key1 = @intCast(value.object.get("key1").?.integer);
+        self.ie = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ie"));
+        self.svbk = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "svbk"));
+        self.iflags = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "iflags"));
+        self.key1 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "key1"));
     }
 
     pub fn memory(self: *MemoryBus) Memory(u16, u8) {
@@ -271,7 +281,6 @@ pub const MemoryBus = struct {
                 .read = read,
                 .write = write,
                 .deinit = deinitMemory,
-                .jsonStringify = jsonStringify,
             },
         };
     }

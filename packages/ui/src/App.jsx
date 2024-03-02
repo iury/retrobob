@@ -215,10 +215,7 @@ function App() {
             {hasBattery && (
               <Alert title="🔋 Battery Enabled">
                 <Stack>
-                  <Text size="md">The game state will persist every 30 seconds. A small pause may be noticeable.</Text>
-                  <Text size="md">
-                    Alternatively, saving the state manually (by pressing F1) and loading (F4) later is recommended.
-                  </Text>
+                  <Text size="md">The game state will persist every 15 seconds.</Text>
                   <Text>
                     <Button onClick={() => setHasBattery(false)} variant="default">
                       Disable Battery

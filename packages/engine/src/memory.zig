@@ -1,4 +1,5 @@
 const std = @import("std");
+const c = @import("c.zig");
 
 pub fn Memory(comptime Address: anytype, comptime Value: anytype) type {
     return struct {
@@ -11,8 +12,8 @@ pub fn Memory(comptime Address: anytype, comptime Value: anytype) type {
             read: *const fn (ctx: *anyopaque, address: Address) Value,
             write: *const fn (ctx: *anyopaque, address: Address, value: Value) void,
             deinit: *const fn (ctx: *anyopaque) void,
-            jsonStringify: ?*const fn (ctx: *anyopaque, allocator: std.mem.Allocator) anyerror!std.json.Value = null,
-            jsonParse: ?*const fn (ctx: *anyopaque, value: std.json.Value) void = null,
+            serialize: ?*const fn (self: *const anyopaque, pack: *c.mpack_writer_t) void = null,
+            deserialize: ?*const fn (self: *anyopaque, pack: c.mpack_node_t) void = null,
         };
 
         pub fn read(self: *Self, address: Address) Value {
@@ -27,13 +28,12 @@ pub fn Memory(comptime Address: anytype, comptime Value: anytype) type {
             self.vtable.deinit(self.ptr);
         }
 
-        pub fn jsonStringify(self: *const Self, allocator: std.mem.Allocator) !std.json.Value {
-            if (self.vtable.jsonStringify) |f| return try f(self.ptr, allocator);
-            return .null;
+        pub fn serialize(self: *const Self, pack: *c.mpack_writer_t) void {
+            if (self.vtable.serialize) |f| f(self.ptr, pack);
         }
 
-        pub fn jsonParse(self: *Self, value: std.json.Value) void {
-            if (self.vtable.jsonParse) |f| f(self.ptr, value);
+        pub fn deserialize(self: *Self, pack: c.mpack_node_t) void {
+            if (self.vtable.deserialize) |f| f(self.ptr, pack);
         }
     };
 }

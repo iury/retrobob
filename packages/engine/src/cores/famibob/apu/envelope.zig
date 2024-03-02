@@ -1,5 +1,6 @@
 const std = @import("std");
 const LengthCounter = @import("apu.zig").LengthCounter;
+const c = @import("../../../c.zig");
 
 pub const Envelope = struct {
     length_counter: LengthCounter = .{},
@@ -54,29 +55,29 @@ pub const Envelope = struct {
         self.counter = 0;
     }
 
-    pub fn jsonStringify(self: *const Envelope, jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("length_counter");
-        try jw.write(self.length_counter);
-        try jw.objectField("constant_volume");
-        try jw.write(self.constant_volume);
-        try jw.objectField("volume");
-        try jw.write(self.volume);
-        try jw.objectField("start");
-        try jw.write(self.start);
-        try jw.objectField("divider");
-        try jw.write(self.divider);
-        try jw.objectField("counter");
-        try jw.write(self.counter);
-        try jw.endObject();
+    pub fn serialize(self: *const Envelope, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+        c.mpack_write_cstr(pack, "length_counter");
+        self.length_counter.serialize(pack);
+        c.mpack_write_cstr(pack, "constant_volume");
+        c.mpack_write_bool(pack, self.constant_volume);
+        c.mpack_write_cstr(pack, "volume");
+        c.mpack_write_i8(pack, self.volume);
+        c.mpack_write_cstr(pack, "start");
+        c.mpack_write_bool(pack, self.start);
+        c.mpack_write_cstr(pack, "divider");
+        c.mpack_write_i8(pack, self.divider);
+        c.mpack_write_cstr(pack, "counter");
+        c.mpack_write_i8(pack, self.counter);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *Envelope, value: std.json.Value) void {
-        self.length_counter.jsonParse(value.object.get("length_counter").?);
-        self.constant_volume = value.object.get("constant_volume").?.bool;
-        self.volume = @intCast(value.object.get("volume").?.integer);
-        self.start = value.object.get("start").?.bool;
-        self.divider = @intCast(value.object.get("divider").?.integer);
-        self.counter = @intCast(value.object.get("counter").?.integer);
+    pub fn deserialize(self: *Envelope, pack: c.mpack_node_t) void {
+        self.length_counter.deserialize(c.mpack_node_map_cstr(pack, "length_counter"));
+        self.constant_volume = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "constant_volume"));
+        self.volume = c.mpack_node_i8(c.mpack_node_map_cstr(pack, "volume"));
+        self.start = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "start"));
+        self.divider = c.mpack_node_i8(c.mpack_node_map_cstr(pack, "divider"));
+        self.counter = c.mpack_node_i8(c.mpack_node_map_cstr(pack, "counter"));
     }
 };

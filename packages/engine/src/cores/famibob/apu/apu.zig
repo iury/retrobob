@@ -1,6 +1,7 @@
 const std = @import("std");
 const Region = @import("../../core.zig").Region;
 const Memory = @import("../../../memory.zig").Memory;
+const c = @import("../../../c.zig");
 
 pub const LengthCounter = @import("length_counter.zig").LengthCounter;
 pub const FrameCounter = @import("frame_counter.zig").FrameCounter;
@@ -296,41 +297,41 @@ pub const APU = struct {
         };
     }
 
-    pub fn jsonStringify(self: *const APU, jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("enabled");
-        try jw.write(self.enabled);
-        try jw.objectField("current_cycle");
-        try jw.write(self.current_cycle);
-        try jw.objectField("previous_cycle");
-        try jw.write(self.previous_cycle);
-        try jw.objectField("needs_to_run");
-        try jw.write(self.needs_to_run);
-        try jw.objectField("frame_counter");
-        try jw.write(self.frame_counter);
-        try jw.objectField("square1");
-        try jw.write(self.square1);
-        try jw.objectField("square2");
-        try jw.write(self.square2);
-        try jw.objectField("triangle");
-        try jw.write(self.triangle);
-        try jw.objectField("noise");
-        try jw.write(self.noise);
-        try jw.objectField("dmc");
-        try jw.write(self.dmc);
-        try jw.endObject();
+    pub fn serialize(self: *const APU, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+        c.mpack_write_cstr(pack, "enabled");
+        c.mpack_write_bool(pack, self.enabled);
+        c.mpack_write_cstr(pack, "current_cycle");
+        c.mpack_write_u32(pack, self.current_cycle);
+        c.mpack_write_cstr(pack, "previous_cycle");
+        c.mpack_write_u32(pack, self.previous_cycle);
+        c.mpack_write_cstr(pack, "needs_to_run");
+        c.mpack_write_bool(pack, self.needs_to_run);
+        c.mpack_write_cstr(pack, "frame_counter");
+        self.frame_counter.serialize(pack);
+        c.mpack_write_cstr(pack, "square1");
+        self.square1.serialize(pack);
+        c.mpack_write_cstr(pack, "square2");
+        self.square2.serialize(pack);
+        c.mpack_write_cstr(pack, "triangle");
+        self.triangle.serialize(pack);
+        c.mpack_write_cstr(pack, "noise");
+        self.noise.serialize(pack);
+        c.mpack_write_cstr(pack, "dmc");
+        self.dmc.serialize(pack);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *APU, value: std.json.Value) void {
-        self.enabled = value.object.get("enabled").?.bool;
-        self.current_cycle = @intCast(value.object.get("current_cycle").?.integer);
-        self.previous_cycle = @intCast(value.object.get("previous_cycle").?.integer);
-        self.needs_to_run = value.object.get("needs_to_run").?.bool;
-        self.frame_counter.jsonParse(value.object.get("frame_counter").?);
-        self.square1.jsonParse(value.object.get("square1").?);
-        self.square2.jsonParse(value.object.get("square2").?);
-        self.triangle.jsonParse(value.object.get("triangle").?);
-        self.noise.jsonParse(value.object.get("noise").?);
-        self.dmc.jsonParse(value.object.get("dmc").?);
+    pub fn deserialize(self: *APU, pack: c.mpack_node_t) void {
+        self.enabled = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "enabled"));
+        self.current_cycle = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "current_cycle"));
+        self.previous_cycle = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "previous_cycle"));
+        self.needs_to_run = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "needs_to_run"));
+        self.frame_counter.deserialize(c.mpack_node_map_cstr(pack, "frame_counter"));
+        self.square1.deserialize(c.mpack_node_map_cstr(pack, "square1"));
+        self.square2.deserialize(c.mpack_node_map_cstr(pack, "square2"));
+        self.triangle.deserialize(c.mpack_node_map_cstr(pack, "triangle"));
+        self.noise.deserialize(c.mpack_node_map_cstr(pack, "noise"));
+        self.dmc.deserialize(c.mpack_node_map_cstr(pack, "dmc"));
     }
 };

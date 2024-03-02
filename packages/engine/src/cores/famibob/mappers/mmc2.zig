@@ -16,6 +16,7 @@ const std = @import("std");
 const Mirroring = @import("../famibob.zig").Mirroring;
 const Cartridge = @import("../cartridge.zig").Cartridge;
 const Memory = @import("../../../memory.zig").Memory;
+const c = @import("../../../c.zig");
 
 pub const MMC2 = struct {
     allocator: std.mem.Allocator,
@@ -126,40 +127,49 @@ pub const MMC2 = struct {
         }
     }
 
-    fn jsonParse(ctx: *anyopaque, value: std.json.Value) void {
+    fn serialize(ctx: *const anyopaque, pack: *c.mpack_writer_t) void {
+        const self: *const @This() = @ptrCast(@alignCast(ctx));
+        c.mpack_build_map(pack);
+
+        c.mpack_write_cstr(pack, "vram");
+        c.mpack_start_bin(pack, @intCast(self.vram.len));
+        c.mpack_write_bytes(pack, self.vram.ptr, self.vram.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_write_cstr(pack, "mirroring");
+        c.mpack_write_u8(pack, @intFromEnum(self.mirroring));
+        c.mpack_write_cstr(pack, "latch0");
+        c.mpack_write_u8(pack, self.latch0);
+        c.mpack_write_cstr(pack, "latch1");
+        c.mpack_write_u8(pack, self.latch1);
+        c.mpack_write_cstr(pack, "chr_bankFD0");
+        c.mpack_write_u32(pack, @truncate(self.chr_bankFD0));
+        c.mpack_write_cstr(pack, "chr_bankFE0");
+        c.mpack_write_u32(pack, @truncate(self.chr_bankFE0));
+        c.mpack_write_cstr(pack, "chr_bankFD1");
+        c.mpack_write_u32(pack, @truncate(self.chr_bankFD1));
+        c.mpack_write_cstr(pack, "chr_bankFE1");
+        c.mpack_write_u32(pack, @truncate(self.chr_bankFE1));
+        c.mpack_write_cstr(pack, "prg_bank");
+        c.mpack_write_u32(pack, @truncate(self.prg_bank));
+
+        c.mpack_complete_map(pack);
+    }
+
+    fn deserialize(ctx: *anyopaque, pack: c.mpack_node_t) void {
         const self: *@This() = @ptrCast(@alignCast(ctx));
 
         @memset(self.vram, 0);
-        for (value.object.get("vram").?.array.items, 0..) |v, i| {
-            self.vram[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "vram"), self.vram.ptr, self.vram.len);
 
-        self.mirroring = @enumFromInt(value.object.get("mirroring").?.integer);
-        self.latch0 = @intCast(value.object.get("latch0").?.integer);
-        self.latch1 = @intCast(value.object.get("latch1").?.integer);
-        self.chr_bankFD0 = @intCast(value.object.get("chr_bankFD0").?.integer);
-        self.chr_bankFE0 = @intCast(value.object.get("chr_bankFE0").?.integer);
-        self.chr_bankFD1 = @intCast(value.object.get("chr_bankFD1").?.integer);
-        self.chr_bankFE1 = @intCast(value.object.get("chr_bankFE1").?.integer);
-        self.prg_bank = @intCast(value.object.get("prg_bank").?.integer);
-    }
-
-    fn jsonStringify(ctx: *anyopaque, allocator: std.mem.Allocator) !std.json.Value {
-        const self: *@This() = @ptrCast(@alignCast(ctx));
-        var data = std.json.ObjectMap.init(allocator);
-
-        try data.put("mirroring", .{ .integer = @intFromEnum(self.mirroring) });
-        try data.put("vram", .{ .string = self.vram });
-
-        try data.put("latch0", .{ .integer = @as(i64, @intCast(self.latch0)) });
-        try data.put("latch1", .{ .integer = @as(i64, @intCast(self.latch1)) });
-        try data.put("chr_bankFD0", .{ .integer = @as(i64, @intCast(self.chr_bankFD0)) });
-        try data.put("chr_bankFE0", .{ .integer = @as(i64, @intCast(self.chr_bankFE0)) });
-        try data.put("chr_bankFD1", .{ .integer = @as(i64, @intCast(self.chr_bankFD1)) });
-        try data.put("chr_bankFE1", .{ .integer = @as(i64, @intCast(self.chr_bankFE1)) });
-        try data.put("prg_bank", .{ .integer = @as(i64, @intCast(self.prg_bank)) });
-
-        return .{ .object = data };
+        self.mirroring = @enumFromInt(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "mirroring")));
+        self.latch0 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "latch0"));
+        self.latch1 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "latch1"));
+        self.chr_bankFD0 = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "chr_bankFD0"));
+        self.chr_bankFE0 = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "chr_bankFE0"));
+        self.chr_bankFD1 = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "chr_bankFD1"));
+        self.chr_bankFE1 = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "chr_bankFE1"));
+        self.prg_bank = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "prg_bank"));
     }
 
     pub fn memory(self: *@This()) Memory(u16, u8) {
@@ -169,8 +179,8 @@ pub const MMC2 = struct {
                 .read = read,
                 .write = write,
                 .deinit = deinitMemory,
-                .jsonParse = jsonParse,
-                .jsonStringify = jsonStringify,
+                .serialize = serialize,
+                .deserialize = deserialize,
             },
         };
     }

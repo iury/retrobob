@@ -3,6 +3,7 @@ const opcode = @import("opcode.zig");
 const Memory = @import("../../../memory.zig").Memory;
 const Proxy = @import("../../../proxy.zig").Proxy;
 const irq = @import("instructions/irq.zig").irq;
+const c = @import("../../../c.zig");
 
 pub const CPUCycle = enum { finished, addressing, read, write };
 
@@ -414,99 +415,184 @@ pub const CPU = struct {
         self.irq_requested = false;
     }
 
-    pub fn jsonStringify(self: *const @This(), jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("opcode");
-        try jw.write(self.opcode);
-        try jw.objectField("addressing");
-        try jw.write(self.addressing);
-        try jw.objectField("cycle_counter");
-        try jw.write(self.cycle_counter);
-        try jw.objectField("current_cycle");
-        try jw.write(self.current_cycle);
-        try jw.objectField("next_cycle");
-        try jw.write(self.next_cycle);
-        try jw.objectField("dmc_dma");
-        try jw.write(self.dmc_dma);
-        try jw.objectField("oam_dma");
-        try jw.write(self.oam_dma);
-        try jw.objectField("dma_status");
-        try jw.write(self.dma_status);
-        try jw.objectField("dma_cycle");
-        try jw.write(self.dma_cycle);
-        try jw.objectField("dmc_address");
-        try jw.write(self.dmc_address);
-        try jw.objectField("oam_address");
-        try jw.write(self.oam_address);
-        try jw.objectField("oam_counter");
-        try jw.write(self.oam_counter);
-        try jw.objectField("oam_value");
-        try jw.write(self.oam_value);
-        try jw.objectField("pc");
-        try jw.write(self.pc);
-        try jw.objectField("sp");
-        try jw.write(self.sp);
-        try jw.objectField("acc");
-        try jw.write(self.acc);
-        try jw.objectField("x");
-        try jw.write(self.x);
-        try jw.objectField("y");
-        try jw.write(self.y);
-        try jw.objectField("c");
-        try jw.write(self.c);
-        try jw.objectField("z");
-        try jw.write(self.z);
-        try jw.objectField("i");
-        try jw.write(self.i);
-        try jw.objectField("d");
-        try jw.write(self.d);
-        try jw.objectField("b");
-        try jw.write(self.b);
-        try jw.objectField("v");
-        try jw.write(self.v);
-        try jw.objectField("n");
-        try jw.write(self.n);
-        try jw.objectField("irq_occurred");
-        try jw.write(self.irq_occurred);
-        try jw.objectField("nmi_requested");
-        try jw.write(self.nmi_requested);
-        try jw.objectField("rst_requested");
-        try jw.write(self.rst_requested);
-        try jw.objectField("irq_requested");
-        try jw.write(self.irq_requested);
-        try jw.endObject();
+    pub fn serialize(self: *const CPU, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+
+        c.mpack_write_cstr(pack, "addressing");
+        c.mpack_build_array(pack);
+        switch (self.addressing) {
+            .imp => {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.imp));
+            },
+            .acc => {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.acc));
+            },
+            .rel => |v| {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.rel));
+                c.mpack_write_i8(pack, v);
+            },
+            .imm => |v| {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.imm));
+                c.mpack_write_u8(pack, v);
+            },
+            .zpg => |v| {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.zpg));
+                c.mpack_write_u8(pack, v);
+            },
+            .zpx => |v| {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.zpx));
+                c.mpack_write_u8(pack, v);
+            },
+            .zpy => |v| {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.zpy));
+                c.mpack_write_u8(pack, v);
+            },
+            .abs => |v| {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.abs));
+                c.mpack_write_u16(pack, v);
+            },
+            .abx => |v| {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.abx));
+                c.mpack_write_u16(pack, v.@"0");
+                c.mpack_write_bool(pack, v.@"1");
+            },
+            .aby => |v| {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.aby));
+                c.mpack_write_u16(pack, v.@"0");
+                c.mpack_write_bool(pack, v.@"1");
+            },
+            .idx => |v| {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.idx));
+                c.mpack_write_u16(pack, v.@"0");
+                c.mpack_write_u8(pack, v.@"1");
+            },
+            .idy => |v| {
+                c.mpack_write_u8(pack, @intFromEnum(opcode.AddressingMode.idy));
+                c.mpack_write_u16(pack, v.@"0");
+                c.mpack_write_u8(pack, v.@"1");
+                c.mpack_write_bool(pack, v.@"2");
+            },
+        }
+        c.mpack_complete_array(pack);
+
+        c.mpack_write_cstr(pack, "opcode");
+        c.mpack_write_u8(pack, self.opcode);
+        c.mpack_write_cstr(pack, "cycle_counter");
+        c.mpack_write_u8(pack, self.cycle_counter);
+        c.mpack_write_cstr(pack, "current_cycle");
+        c.mpack_write_u8(pack, @intFromEnum(self.current_cycle));
+        c.mpack_write_cstr(pack, "next_cycle");
+        c.mpack_write_u8(pack, @intFromEnum(self.next_cycle));
+        c.mpack_write_cstr(pack, "dmc_dma");
+        c.mpack_write_bool(pack, self.dmc_dma);
+        c.mpack_write_cstr(pack, "oam_dma");
+        c.mpack_write_bool(pack, self.oam_dma);
+        c.mpack_write_cstr(pack, "dma_status");
+        c.mpack_write_u8(pack, @intFromEnum(self.dma_status));
+        c.mpack_write_cstr(pack, "dma_cycle");
+        c.mpack_write_u8(pack, @intFromEnum(self.dma_cycle));
+        c.mpack_write_cstr(pack, "dmc_address");
+        c.mpack_write_u16(pack, self.dmc_address);
+        c.mpack_write_cstr(pack, "oam_address");
+        c.mpack_write_u16(pack, self.oam_address);
+        c.mpack_write_cstr(pack, "oam_counter");
+        c.mpack_write_u8(pack, self.oam_counter);
+        c.mpack_write_cstr(pack, "oam_value");
+        c.mpack_write_u8(pack, self.oam_value);
+        c.mpack_write_cstr(pack, "pc");
+        c.mpack_write_u16(pack, self.pc);
+        c.mpack_write_cstr(pack, "sp");
+        c.mpack_write_u8(pack, self.sp);
+        c.mpack_write_cstr(pack, "acc");
+        c.mpack_write_u8(pack, self.acc);
+        c.mpack_write_cstr(pack, "x");
+        c.mpack_write_u8(pack, self.x);
+        c.mpack_write_cstr(pack, "y");
+        c.mpack_write_u8(pack, self.y);
+        c.mpack_write_cstr(pack, "c");
+        c.mpack_write_bool(pack, self.c);
+        c.mpack_write_cstr(pack, "z");
+        c.mpack_write_bool(pack, self.z);
+        c.mpack_write_cstr(pack, "i");
+        c.mpack_write_bool(pack, self.i);
+        c.mpack_write_cstr(pack, "d");
+        c.mpack_write_bool(pack, self.d);
+        c.mpack_write_cstr(pack, "b");
+        c.mpack_write_bool(pack, self.b);
+        c.mpack_write_cstr(pack, "v");
+        c.mpack_write_bool(pack, self.v);
+        c.mpack_write_cstr(pack, "n");
+        c.mpack_write_bool(pack, self.n);
+        c.mpack_write_cstr(pack, "irq_occurred");
+        c.mpack_write_bool(pack, self.irq_occurred);
+        c.mpack_write_cstr(pack, "nmi_requested");
+        c.mpack_write_bool(pack, self.nmi_requested);
+        c.mpack_write_cstr(pack, "rst_requested");
+        c.mpack_write_bool(pack, self.rst_requested);
+        c.mpack_write_cstr(pack, "irq_requested");
+        c.mpack_write_bool(pack, self.irq_requested);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *CPU, value: std.json.Value) void {
-        self.cycle_counter = @intCast(value.object.get("cycle_counter").?.integer);
-        self.current_cycle = std.meta.stringToEnum(@TypeOf(self.current_cycle), value.object.get("current_cycle").?.string).?;
-        self.next_cycle = std.meta.stringToEnum(@TypeOf(self.next_cycle), value.object.get("next_cycle").?.string).?;
+    pub fn deserialize(self: *CPU, pack: c.mpack_node_t) void {
+        const addressing: opcode.AddressingMode = @enumFromInt(c.mpack_node_u8(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 0)));
+        switch (addressing) {
+            .acc => self.addressing = .acc,
+            .imp => self.addressing = .imp,
+            .rel => self.addressing = .{ .rel = c.mpack_node_i8(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 1)) },
+            .imm => self.addressing = .{ .imm = c.mpack_node_u8(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 1)) },
+            .zpg => self.addressing = .{ .zpg = c.mpack_node_u8(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 1)) },
+            .zpx => self.addressing = .{ .zpx = c.mpack_node_u8(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 1)) },
+            .zpy => self.addressing = .{ .zpy = c.mpack_node_u8(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 1)) },
+            .abs => self.addressing = .{ .abs = c.mpack_node_u16(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 1)) },
+            .abx => self.addressing = .{ .abx = .{
+                c.mpack_node_u16(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 1)),
+                c.mpack_node_bool(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 2)),
+            } },
+            .aby => self.addressing = .{ .aby = .{
+                c.mpack_node_u16(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 1)),
+                c.mpack_node_bool(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 2)),
+            } },
+            .idx => self.addressing = .{ .idx = .{
+                c.mpack_node_u16(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 1)),
+                c.mpack_node_u8(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 2)),
+            } },
+            .idy => self.addressing = .{ .idy = .{
+                c.mpack_node_u16(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 1)),
+                c.mpack_node_u8(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 2)),
+                c.mpack_node_bool(c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "addressing"), 3)),
+            } },
+            .ind => {},
+        }
 
-        self.dmc_dma = value.object.get("dmc_dma").?.bool;
-        self.oam_dma = value.object.get("oam_dma").?.bool;
-        self.dma_status = std.meta.stringToEnum(@TypeOf(self.dma_status), value.object.get("dma_status").?.string).?;
-        self.dma_cycle = std.meta.stringToEnum(@TypeOf(self.dma_cycle), value.object.get("dma_cycle").?.string).?;
-        self.dmc_address = @intCast(value.object.get("dmc_address").?.integer);
-        self.oam_address = @intCast(value.object.get("oam_address").?.integer);
-        self.oam_counter = @intCast(value.object.get("oam_counter").?.integer);
-        self.oam_value = @intCast(value.object.get("oam_value").?.integer);
-
-        self.pc = @intCast(value.object.get("pc").?.integer);
-        self.sp = @intCast(value.object.get("sp").?.integer);
-        self.acc = @intCast(value.object.get("acc").?.integer);
-        self.x = @intCast(value.object.get("x").?.integer);
-        self.y = @intCast(value.object.get("y").?.integer);
-        self.c = value.object.get("c").?.bool;
-        self.z = value.object.get("z").?.bool;
-        self.i = value.object.get("i").?.bool;
-        self.d = value.object.get("d").?.bool;
-        self.b = value.object.get("b").?.bool;
-        self.v = value.object.get("v").?.bool;
-        self.n = value.object.get("n").?.bool;
-        self.irq_occurred = value.object.get("irq_occurred").?.bool;
-        self.nmi_requested = value.object.get("nmi_requested").?.bool;
-        self.rst_requested = value.object.get("rst_requested").?.bool;
-        self.irq_requested = value.object.get("irq_requested").?.bool;
+        self.current_cycle = @enumFromInt(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "current_cycle")));
+        self.next_cycle = @enumFromInt(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "next_cycle")));
+        self.dma_status = @enumFromInt(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "dma_status")));
+        self.dma_cycle = @enumFromInt(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "dma_cycle")));
+        self.opcode = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "opcode"));
+        self.cycle_counter = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "cycle_counter"));
+        self.dmc_dma = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "dmc_dma"));
+        self.oam_dma = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "oam_dma"));
+        self.dmc_address = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "dmc_address"));
+        self.oam_address = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "oam_address"));
+        self.oam_counter = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "oam_counter"));
+        self.oam_value = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "oam_value"));
+        self.pc = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "pc"));
+        self.sp = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "sp"));
+        self.acc = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "acc"));
+        self.x = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "x"));
+        self.y = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "y"));
+        self.c = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "c"));
+        self.z = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "z"));
+        self.i = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "i"));
+        self.d = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "d"));
+        self.b = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "b"));
+        self.v = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "v"));
+        self.n = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "n"));
+        self.irq_occurred = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "irq_occurred"));
+        self.nmi_requested = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "nmi_requested"));
+        self.rst_requested = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "rst_requested"));
+        self.irq_requested = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "irq_requested"));
     }
 };
 

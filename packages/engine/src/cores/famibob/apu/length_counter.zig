@@ -1,4 +1,5 @@
 const std = @import("std");
+const c = @import("../../../c.zig");
 
 pub const LengthCounter = struct {
     const lookup_table: []const u8 = &[_]u8{ 10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30 };
@@ -55,29 +56,29 @@ pub const LengthCounter = struct {
         self.previous_value = 0;
     }
 
-    pub fn jsonStringify(self: *const LengthCounter, jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("new_halt_value");
-        try jw.write(self.new_halt_value);
-        try jw.objectField("enabled");
-        try jw.write(self.enabled);
-        try jw.objectField("halt");
-        try jw.write(self.halt);
-        try jw.objectField("counter");
-        try jw.write(self.counter);
-        try jw.objectField("reload_value");
-        try jw.write(self.reload_value);
-        try jw.objectField("previous_value");
-        try jw.write(self.previous_value);
-        try jw.endObject();
+    pub fn serialize(self: *const LengthCounter, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+        c.mpack_write_cstr(pack, "new_halt_value");
+        c.mpack_write_bool(pack, self.new_halt_value);
+        c.mpack_write_cstr(pack, "enabled");
+        c.mpack_write_bool(pack, self.enabled);
+        c.mpack_write_cstr(pack, "halt");
+        c.mpack_write_bool(pack, self.halt);
+        c.mpack_write_cstr(pack, "counter");
+        c.mpack_write_u8(pack, self.counter);
+        c.mpack_write_cstr(pack, "reload_value");
+        c.mpack_write_u8(pack, self.reload_value);
+        c.mpack_write_cstr(pack, "previous_value");
+        c.mpack_write_u8(pack, self.previous_value);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *LengthCounter, value: std.json.Value) void {
-        self.new_halt_value = value.object.get("new_halt_value").?.bool;
-        self.enabled = value.object.get("enabled").?.bool;
-        self.halt = value.object.get("halt").?.bool;
-        self.counter = @intCast(value.object.get("counter").?.integer);
-        self.reload_value = @intCast(value.object.get("reload_value").?.integer);
-        self.previous_value = @intCast(value.object.get("previous_value").?.integer);
+    pub fn deserialize(self: *LengthCounter, pack: c.mpack_node_t) void {
+        self.new_halt_value = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "new_halt_value"));
+        self.enabled = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "enabled"));
+        self.halt = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "halt"));
+        self.counter = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "counter"));
+        self.reload_value = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "reload_value"));
+        self.previous_value = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "previous_value"));
     }
 };

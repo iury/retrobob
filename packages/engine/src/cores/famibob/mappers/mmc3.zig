@@ -23,6 +23,7 @@ const std = @import("std");
 const Mirroring = @import("../famibob.zig").Mirroring;
 const Cartridge = @import("../cartridge.zig").Cartridge;
 const Memory = @import("../../../memory.zig").Memory;
+const c = @import("../../../c.zig");
 
 pub const MMC3 = struct {
     allocator: std.mem.Allocator,
@@ -276,75 +277,93 @@ pub const MMC3 = struct {
         }
     }
 
-    fn jsonParse(ctx: *anyopaque, value: std.json.Value) void {
+    fn serialize(ctx: *const anyopaque, pack: *c.mpack_writer_t) void {
+        const self: *const @This() = @ptrCast(@alignCast(ctx));
+        c.mpack_build_map(pack);
+
+        c.mpack_write_cstr(pack, "vram");
+        c.mpack_start_bin(pack, @intCast(self.vram.len));
+        c.mpack_write_bytes(pack, self.vram.ptr, self.vram.len);
+        c.mpack_finish_bin(pack);
+
+        c.mpack_write_cstr(pack, "prg_ram");
+        c.mpack_start_bin(pack, @intCast(self.prg_ram.len));
+        c.mpack_write_bytes(pack, self.prg_ram.ptr, self.prg_ram.len);
+        c.mpack_finish_bin(pack);
+
+        if (self.chr_ram) |chr| {
+            c.mpack_write_cstr(pack, "chr_ram");
+            c.mpack_start_bin(pack, @intCast(chr.len));
+            c.mpack_write_bytes(pack, chr.ptr, chr.len);
+            c.mpack_finish_bin(pack);
+        }
+
+        c.mpack_write_cstr(pack, "mirroring");
+        c.mpack_write_u8(pack, @intFromEnum(self.mirroring));
+        c.mpack_write_cstr(pack, "prev_a12");
+        c.mpack_write_u8(pack, self.prev_a12);
+        c.mpack_write_cstr(pack, "irq_counter");
+        c.mpack_write_u8(pack, self.irq_counter);
+        c.mpack_write_cstr(pack, "irq_latch");
+        c.mpack_write_u8(pack, self.irq_latch);
+        c.mpack_write_cstr(pack, "irq_reload");
+        c.mpack_write_bool(pack, self.irq_reload);
+        c.mpack_write_cstr(pack, "irq_enabled");
+        c.mpack_write_bool(pack, self.irq_enabled);
+        c.mpack_write_cstr(pack, "irq_occurred");
+        c.mpack_write_bool(pack, self.irq_occurred);
+        c.mpack_write_cstr(pack, "control");
+        c.mpack_write_u8(pack, self.control);
+        c.mpack_write_cstr(pack, "r0");
+        c.mpack_write_u8(pack, self.r0);
+        c.mpack_write_cstr(pack, "r1");
+        c.mpack_write_u8(pack, self.r1);
+        c.mpack_write_cstr(pack, "r2");
+        c.mpack_write_u8(pack, self.r2);
+        c.mpack_write_cstr(pack, "r3");
+        c.mpack_write_u8(pack, self.r3);
+        c.mpack_write_cstr(pack, "r4");
+        c.mpack_write_u8(pack, self.r4);
+        c.mpack_write_cstr(pack, "r5");
+        c.mpack_write_u8(pack, self.r5);
+        c.mpack_write_cstr(pack, "r6");
+        c.mpack_write_u8(pack, self.r6);
+        c.mpack_write_cstr(pack, "r7");
+        c.mpack_write_u8(pack, self.r7);
+
+        c.mpack_complete_map(pack);
+    }
+
+    fn deserialize(ctx: *anyopaque, pack: c.mpack_node_t) void {
         const self: *@This() = @ptrCast(@alignCast(ctx));
 
         @memset(self.vram, 0);
-        for (value.object.get("vram").?.array.items, 0..) |v, i| {
-            self.vram[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "vram"), self.vram.ptr, self.vram.len);
 
         @memset(self.prg_ram, 0);
-        for (value.object.get("prg_ram").?.array.items, 0..) |v, i| {
-            self.prg_ram[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "prg_ram"), self.prg_ram.ptr, self.prg_ram.len);
 
         if (self.chr_ram) |chr| {
             @memset(chr, 0);
-            for (value.object.get("chr_ram").?.array.items, 0..) |v, i| {
-                chr[i] = @intCast(v.integer);
-            }
+            _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "chr_ram"), chr.ptr, chr.len);
         }
 
-        self.mirroring = @enumFromInt(value.object.get("mirroring").?.integer);
-        self.prev_a12 = @intCast(value.object.get("prev_a12").?.integer);
-        self.irq_counter = @intCast(value.object.get("irq_counter").?.integer);
-        self.irq_latch = @intCast(value.object.get("irq_latch").?.integer);
-        self.irq_reload = value.object.get("irq_reload").?.bool;
-        self.irq_enabled = value.object.get("irq_enabled").?.bool;
-        self.irq_occurred = value.object.get("irq_occurred").?.bool;
-        self.control = @intCast(value.object.get("control").?.integer);
-        self.r0 = @intCast(value.object.get("r0").?.integer);
-        self.r1 = @intCast(value.object.get("r1").?.integer);
-        self.r2 = @intCast(value.object.get("r2").?.integer);
-        self.r3 = @intCast(value.object.get("r3").?.integer);
-        self.r4 = @intCast(value.object.get("r4").?.integer);
-        self.r5 = @intCast(value.object.get("r5").?.integer);
-        self.r6 = @intCast(value.object.get("r6").?.integer);
-        self.r7 = @intCast(value.object.get("r7").?.integer);
-    }
-
-    fn jsonStringify(ctx: *anyopaque, allocator: std.mem.Allocator) !std.json.Value {
-        const self: *@This() = @ptrCast(@alignCast(ctx));
-        var data = std.json.ObjectMap.init(allocator);
-
-        try data.put("mirroring", .{ .integer = @intFromEnum(self.mirroring) });
-        try data.put("vram", .{ .string = self.vram });
-        try data.put("prg_ram", .{ .string = self.prg_ram });
-
-        try data.put("prev_a12", .{ .integer = @as(i64, @intCast(self.prev_a12)) });
-        try data.put("irq_counter", .{ .integer = @as(i64, @intCast(self.irq_counter)) });
-        try data.put("irq_latch", .{ .integer = @as(i64, @intCast(self.irq_latch)) });
-        try data.put("irq_reload", .{ .bool = self.irq_reload });
-        try data.put("irq_enabled", .{ .bool = self.irq_enabled });
-        try data.put("irq_occurred", .{ .bool = self.irq_occurred });
-        try data.put("control", .{ .integer = @as(i64, @intCast(self.control)) });
-        try data.put("r0", .{ .integer = @as(i64, @intCast(self.r0)) });
-        try data.put("r1", .{ .integer = @as(i64, @intCast(self.r1)) });
-        try data.put("r2", .{ .integer = @as(i64, @intCast(self.r2)) });
-        try data.put("r3", .{ .integer = @as(i64, @intCast(self.r3)) });
-        try data.put("r4", .{ .integer = @as(i64, @intCast(self.r4)) });
-        try data.put("r5", .{ .integer = @as(i64, @intCast(self.r5)) });
-        try data.put("r6", .{ .integer = @as(i64, @intCast(self.r6)) });
-        try data.put("r7", .{ .integer = @as(i64, @intCast(self.r7)) });
-
-        if (self.chr_ram) |arr| {
-            try data.put("chr_ram", .{ .string = arr });
-        } else {
-            try data.put("chr_ram", .null);
-        }
-
-        return .{ .object = data };
+        self.mirroring = @enumFromInt(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "mirroring")));
+        self.prev_a12 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "prev_a12"));
+        self.irq_counter = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "irq_counter"));
+        self.irq_latch = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "irq_latch"));
+        self.irq_reload = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "irq_reload"));
+        self.irq_enabled = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "irq_enabled"));
+        self.irq_occurred = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "irq_occurred"));
+        self.control = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "control"));
+        self.r0 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "r0"));
+        self.r1 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "r1"));
+        self.r2 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "r2"));
+        self.r3 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "r3"));
+        self.r4 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "r4"));
+        self.r5 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "r5"));
+        self.r6 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "r6"));
+        self.r7 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "r7"));
     }
 
     pub fn memory(self: *@This()) Memory(u16, u8) {
@@ -354,8 +373,8 @@ pub const MMC3 = struct {
                 .read = read,
                 .write = write,
                 .deinit = deinitMemory,
-                .jsonParse = jsonParse,
-                .jsonStringify = jsonStringify,
+                .serialize = serialize,
+                .deserialize = deserialize,
             },
         };
     }

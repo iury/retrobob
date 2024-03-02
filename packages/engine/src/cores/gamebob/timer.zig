@@ -1,6 +1,7 @@
 const std = @import("std");
 const IO = @import("io.zig").IO;
 const Memory = @import("../../memory.zig").Memory;
+const c = @import("../../c.zig");
 
 const TAC = packed struct {
     divider: enum(u2) { m256 = 0, m4, m16, m64 },
@@ -114,36 +115,37 @@ pub const Timer = struct {
         };
     }
 
-    pub fn jsonStringify(self: *const @This(), jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("tima");
-        try jw.write(self.tima);
-        try jw.objectField("tma");
-        try jw.write(self.tma);
-        try jw.objectField("overflow");
-        try jw.write(self.overflow);
-        try jw.objectField("counter");
-        try jw.write(self.counter);
-        try jw.objectField("tac");
-        try jw.write(self.tac);
-        try jw.endObject();
+    pub fn serialize(self: *const @This(), pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+
+        c.mpack_write_cstr(pack, "overflow");
+        if (self.overflow) |v| {
+            c.mpack_write_bool(pack, v);
+        } else {
+            c.mpack_write_nil(pack);
+        }
+
+        c.mpack_write_cstr(pack, "tima");
+        c.mpack_write_u8(pack, self.tima);
+        c.mpack_write_cstr(pack, "tma");
+        c.mpack_write_u8(pack, self.tma);
+        c.mpack_write_cstr(pack, "counter");
+        c.mpack_write_u16(pack, @as(u14, @bitCast(self.counter)));
+        c.mpack_write_cstr(pack, "tac");
+        c.mpack_write_u8(pack, @bitCast(self.tac));
+
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *Timer, value: std.json.Value) void {
-        const counter = value.object.get("counter").?;
-        self.counter.div = @intCast(counter.object.get("div").?.integer);
-        self.counter.tickers = @intCast(counter.object.get("tickers").?.integer);
-
-        const tac = value.object.get("tac").?;
-        self.tac.divider = std.meta.stringToEnum(@TypeOf(self.tac.divider), tac.object.get("divider").?.string).?;
-        self.tac.enable = tac.object.get("enable").?.bool;
-
-        self.overflow = switch (value.object.get("overflow").?) {
-            .bool => |v| v,
+    pub fn deserialize(self: *Timer, pack: c.mpack_node_t) void {
+        self.overflow = switch (c.mpack_node_type(c.mpack_node_map_cstr(pack, "overflow"))) {
+            c.mpack_type_bool => c.mpack_node_bool(c.mpack_node_map_cstr(pack, "overflow")),
             else => null,
         };
 
-        self.tima = @intCast(value.object.get("tima").?.integer);
-        self.tma = @intCast(value.object.get("tma").?.integer);
+        self.counter = @bitCast(@as(u14, @intCast(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "counter")))));
+        self.tac = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "tac")));
+        self.tima = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "tima")));
+        self.tma = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "tma")));
     }
 };

@@ -1,6 +1,7 @@
 const std = @import("std");
 const IO = @import("io.zig").IO;
 const Memory = @import("../../memory.zig").Memory;
+const c = @import("../../c.zig");
 
 // LCD Control Register
 const LCDC = packed struct {
@@ -465,9 +466,9 @@ pub const PPU = struct {
                     }
 
                     if (sprite.pattern[j]) |color| {
-                        const c = @as(usize, color) * 2;
+                        const cl = @as(usize, color) * 2;
                         const palette: usize = if (self.dmg_mode) (if (sprite.attr.dmg_palette == 0) 0 else 8) else @as(usize, sprite.attr.cgb_palette) * 8;
-                        colors[x] = rgbcolor(self.ocpd[palette + c], self.ocpd[palette + c + 1]);
+                        colors[x] = rgbcolor(self.ocpd[palette + cl], self.ocpd[palette + cl + 1]);
                         priorities[x] = sprite.attr.priority;
                         opaque_sprite[x] = i;
                     }
@@ -603,12 +604,12 @@ pub const PPU = struct {
 
             out_color = blk: {
                 if (self.dmg_mode) {
-                    const c = @as(usize, @intCast((self.bgp >> (@as(u3, color) << 1)) & 3)) * 2;
-                    break :blk rgbcolor(self.bcpd[c], self.bcpd[c + 1]);
+                    const cl = @as(usize, @intCast((self.bgp >> (@as(u3, color) << 1)) & 3)) * 2;
+                    break :blk rgbcolor(self.bcpd[cl], self.bcpd[cl + 1]);
                 } else {
-                    const c = @as(usize, color) * 2;
+                    const cl = @as(usize, color) * 2;
                     const palette: usize = @as(usize, bgattr.palette) * 8;
-                    break :blk rgbcolor(self.bcpd[palette + c], self.bcpd[palette + c + 1]);
+                    break :blk rgbcolor(self.bcpd[palette + cl], self.bcpd[palette + cl + 1]);
                 }
             };
 
@@ -742,157 +743,122 @@ pub const PPU = struct {
         };
     }
 
-    pub fn jsonStringify(self: *const @This(), jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("vram");
-        try jw.write(self.vram);
-        try jw.objectField("dmg_mode");
-        try jw.write(self.dmg_mode);
-        try jw.objectField("vbk");
-        try jw.write(self.vbk);
+    pub fn serialize(self: *const PPU, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
 
-        try jw.objectField("lcdc");
-        try jw.beginObject();
-        try jw.objectField("bg_enable");
-        try jw.write(self.lcdc.bg_enable);
-        try jw.objectField("obj_enable");
-        try jw.write(self.lcdc.obj_enable);
-        try jw.objectField("obj_big");
-        try jw.write(self.lcdc.obj_big);
-        try jw.objectField("bg_tilemap");
-        try jw.write(self.lcdc.bg_tilemap);
-        try jw.objectField("tiledata");
-        try jw.write(self.lcdc.tiledata);
-        try jw.objectField("wnd_enable");
-        try jw.write(self.lcdc.wnd_enable);
-        try jw.objectField("wnd_tilemap");
-        try jw.write(self.lcdc.wnd_tilemap);
-        try jw.objectField("ppu_enable");
-        try jw.write(self.lcdc.ppu_enable);
-        try jw.endObject();
+        c.mpack_write_cstr(pack, "vram");
+        c.mpack_start_bin(pack, @intCast(self.vram.len));
+        c.mpack_write_bytes(pack, self.vram.ptr, self.vram.len);
+        c.mpack_finish_bin(pack);
 
-        try jw.objectField("stat");
-        try jw.write(self.stat);
+        c.mpack_write_cstr(pack, "oam");
+        c.mpack_start_bin(pack, @intCast(self.oam.len));
+        c.mpack_write_bytes(pack, &self.oam, self.oam.len);
+        c.mpack_finish_bin(pack);
 
-        try jw.objectField("scy");
-        try jw.write(self.scy);
-        try jw.objectField("scx");
-        try jw.write(self.scx);
-        try jw.objectField("ly");
-        try jw.write(self.ly);
-        try jw.objectField("lyc");
-        try jw.write(self.lyc);
-        try jw.objectField("wly");
-        try jw.write(self.wly);
-        try jw.objectField("wy");
-        try jw.write(self.wy);
-        try jw.objectField("wx");
-        try jw.write(self.wx);
-        try jw.objectField("opri");
-        try jw.write(self.opri);
+        c.mpack_write_cstr(pack, "bcpd");
+        c.mpack_start_bin(pack, @intCast(self.bcpd.len));
+        c.mpack_write_bytes(pack, &self.bcpd, self.bcpd.len);
+        c.mpack_finish_bin(pack);
 
-        try jw.objectField("oam");
-        try jw.write(self.oam);
+        c.mpack_write_cstr(pack, "ocpd");
+        c.mpack_start_bin(pack, @intCast(self.ocpd.len));
+        c.mpack_write_bytes(pack, &self.ocpd, self.ocpd.len);
+        c.mpack_finish_bin(pack);
 
-        try jw.objectField("hdma5");
-        try jw.write(self.hdma5);
-        try jw.objectField("hdmas");
-        try jw.write(self.hdmas);
-        try jw.objectField("hdmad");
-        try jw.write(self.hdmad);
-
-        try jw.objectField("bgp");
-        try jw.write(self.bgp);
-        try jw.objectField("obp0");
-        try jw.write(self.obp0);
-        try jw.objectField("obp1");
-        try jw.write(self.obp1);
-        try jw.objectField("bcps");
-        try jw.write(self.bcps);
-        try jw.objectField("ocps");
-        try jw.write(self.ocps);
-        try jw.objectField("bcpd");
-        try jw.write(self.bcpd);
-        try jw.objectField("ocpd");
-        try jw.write(self.ocpd);
-
-        try jw.objectField("stat_blocking");
-        try jw.write(self.stat_blocking);
-        try jw.objectField("stat_irq_delay");
-        try jw.write(self.stat_irq_delay);
-        try jw.objectField("stat_irq");
-        try jw.write(self.stat_irq);
-
-        try jw.objectField("mode");
-        try jw.write(self.mode);
-        try jw.objectField("mode3_length");
-        try jw.write(self.mode3_length);
-        try jw.objectField("cycle_counter");
-        try jw.write(self.cycle_counter);
-        try jw.endObject();
+        c.mpack_write_cstr(pack, "dmg_mode");
+        c.mpack_write_bool(pack, self.dmg_mode);
+        c.mpack_write_cstr(pack, "vbk");
+        c.mpack_write_u8(pack, self.vbk);
+        c.mpack_write_cstr(pack, "lcdc");
+        c.mpack_write_u8(pack, @bitCast(self.lcdc));
+        c.mpack_write_cstr(pack, "stat");
+        c.mpack_write_u8(pack, self.stat);
+        c.mpack_write_cstr(pack, "scy");
+        c.mpack_write_u8(pack, self.scy);
+        c.mpack_write_cstr(pack, "scx");
+        c.mpack_write_u8(pack, self.scx);
+        c.mpack_write_cstr(pack, "ly");
+        c.mpack_write_u8(pack, self.ly);
+        c.mpack_write_cstr(pack, "lyc");
+        c.mpack_write_u8(pack, self.lyc);
+        c.mpack_write_cstr(pack, "wly");
+        c.mpack_write_u8(pack, self.wly);
+        c.mpack_write_cstr(pack, "wy");
+        c.mpack_write_u8(pack, self.wy);
+        c.mpack_write_cstr(pack, "wx");
+        c.mpack_write_u8(pack, self.wx);
+        c.mpack_write_cstr(pack, "opri");
+        c.mpack_write_bool(pack, self.opri);
+        c.mpack_write_cstr(pack, "hdma5");
+        c.mpack_write_u8(pack, self.hdma5);
+        c.mpack_write_cstr(pack, "hdmas");
+        c.mpack_write_u16(pack, self.hdmas);
+        c.mpack_write_cstr(pack, "hdmad");
+        c.mpack_write_u16(pack, self.hdmad);
+        c.mpack_write_cstr(pack, "bgp");
+        c.mpack_write_u8(pack, self.bgp);
+        c.mpack_write_cstr(pack, "obp0");
+        c.mpack_write_u8(pack, self.obp0);
+        c.mpack_write_cstr(pack, "obp1");
+        c.mpack_write_u8(pack, self.obp1);
+        c.mpack_write_cstr(pack, "bcps");
+        c.mpack_write_u8(pack, self.bcps);
+        c.mpack_write_cstr(pack, "ocps");
+        c.mpack_write_u8(pack, self.ocps);
+        c.mpack_write_cstr(pack, "stat_blocking");
+        c.mpack_write_bool(pack, self.stat_blocking);
+        c.mpack_write_cstr(pack, "stat_irq_delay");
+        c.mpack_write_u8(pack, self.stat_irq_delay);
+        c.mpack_write_cstr(pack, "stat_irq");
+        c.mpack_write_u8(pack, self.stat_irq);
+        c.mpack_write_cstr(pack, "mode");
+        c.mpack_write_u8(pack, self.mode);
+        c.mpack_write_cstr(pack, "mode3_length");
+        c.mpack_write_u16(pack, self.mode3_length);
+        c.mpack_write_cstr(pack, "cycle_counter");
+        c.mpack_write_u16(pack, self.cycle_counter);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *PPU, value: std.json.Value) void {
+    pub fn deserialize(self: *PPU, pack: c.mpack_node_t) void {
         @memset(self.vram, 0);
-        for (value.object.get("vram").?.array.items, 0..) |v, i| {
-            self.vram[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "vram"), self.vram.ptr, self.vram.len);
 
         @memset(&self.oam, 0);
-        for (value.object.get("oam").?.array.items, 0..) |v, i| {
-            self.oam[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "oam"), &self.oam, self.oam.len);
 
         @memset(&self.bcpd, 0);
-        for (value.object.get("bcpd").?.array.items, 0..) |v, i| {
-            self.bcpd[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "bcpd"), &self.bcpd, self.bcpd.len);
 
         @memset(&self.ocpd, 0);
-        for (value.object.get("ocpd").?.array.items, 0..) |v, i| {
-            self.ocpd[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "ocpd"), &self.ocpd, self.ocpd.len);
 
-        self.dmg_mode = value.object.get("dmg_mode").?.bool;
-        self.vbk = @intCast(value.object.get("vbk").?.integer);
-
-        const lcdc = value.object.get("lcdc").?;
-        self.lcdc.bg_enable = lcdc.object.get("bg_enable").?.bool;
-        self.lcdc.obj_enable = lcdc.object.get("obj_enable").?.bool;
-        self.lcdc.obj_big = lcdc.object.get("obj_big").?.bool;
-        self.lcdc.bg_tilemap = lcdc.object.get("bg_tilemap").?.bool;
-        self.lcdc.tiledata = lcdc.object.get("tiledata").?.bool;
-        self.lcdc.wnd_enable = lcdc.object.get("wnd_enable").?.bool;
-        self.lcdc.wnd_tilemap = lcdc.object.get("wnd_tilemap").?.bool;
-        self.lcdc.ppu_enable = lcdc.object.get("ppu_enable").?.bool;
-
-        self.stat = @intCast(value.object.get("stat").?.integer);
-
-        self.scy = @intCast(value.object.get("scy").?.integer);
-        self.scx = @intCast(value.object.get("scx").?.integer);
-        self.ly = @intCast(value.object.get("ly").?.integer);
-        self.lyc = @intCast(value.object.get("lyc").?.integer);
-        self.wly = @intCast(value.object.get("wly").?.integer);
-        self.wy = @intCast(value.object.get("wy").?.integer);
-        self.wx = @intCast(value.object.get("wx").?.integer);
-        self.opri = value.object.get("opri").?.bool;
-
-        self.hdma5 = @intCast(value.object.get("hdma5").?.integer);
-        self.hdmas = @intCast(value.object.get("hdmas").?.integer);
-        self.hdmad = @intCast(value.object.get("hdmad").?.integer);
-
-        self.bgp = @intCast(value.object.get("bgp").?.integer);
-        self.obp0 = @intCast(value.object.get("obp0").?.integer);
-        self.obp1 = @intCast(value.object.get("obp1").?.integer);
-        self.bcps = @intCast(value.object.get("bcps").?.integer);
-        self.ocps = @intCast(value.object.get("ocps").?.integer);
-
-        self.stat_blocking = value.object.get("stat_blocking").?.bool;
-        self.stat_irq_delay = @intCast(value.object.get("stat_irq_delay").?.integer);
-        self.stat_irq = @intCast(value.object.get("stat_irq").?.integer);
-
-        self.mode = @intCast(value.object.get("mode").?.integer);
-        self.mode3_length = @intCast(value.object.get("mode3_length").?.integer);
-        self.cycle_counter = @intCast(value.object.get("cycle_counter").?.integer);
+        self.dmg_mode = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "dmg_mode"));
+        self.vbk = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "vbk"));
+        self.lcdc = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "lcdc")));
+        self.stat = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "stat"));
+        self.scy = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "scy"));
+        self.scx = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "scx"));
+        self.ly = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ly"));
+        self.lyc = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "lyc"));
+        self.wly = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "wly"));
+        self.wy = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "wy"));
+        self.wx = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "wx"));
+        self.opri = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "opri"));
+        self.hdma5 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "hdma5"));
+        self.hdmas = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "hdmas"));
+        self.hdmad = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "hdmad"));
+        self.bgp = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "bgp"));
+        self.obp0 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "obp0"));
+        self.obp1 = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "obp1"));
+        self.bcps = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "bcps"));
+        self.ocps = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ocps"));
+        self.stat_blocking = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "stat_blocking"));
+        self.stat_irq_delay = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "stat_irq_delay"));
+        self.stat_irq = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "stat_irq"));
+        self.mode = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "mode"));
+        self.mode3_length = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "mode3_length"));
+        self.cycle_counter = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "cycle_counter"));
     }
 };

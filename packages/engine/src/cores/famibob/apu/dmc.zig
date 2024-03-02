@@ -1,6 +1,7 @@
 const std = @import("std");
 const Timer = @import("apu.zig").Timer;
 const Proxy = @import("../../../proxy.zig").Proxy;
+const c = @import("../../../c.zig");
 
 pub const DMC = struct {
     pub const lookup_table_ntsc: []const u16 = &[_]u16{ 428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54 };
@@ -165,62 +166,62 @@ pub const DMC = struct {
         };
     }
 
-    pub fn jsonStringify(self: *const DMC, jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("timer");
-        try jw.write(self.timer);
-        try jw.objectField("irq_requested");
-        try jw.write(self.irq_requested);
-        try jw.objectField("sample_addr");
-        try jw.write(self.sample_addr);
-        try jw.objectField("sample_length");
-        try jw.write(self.sample_length);
-        try jw.objectField("output_level");
-        try jw.write(self.output_level);
-        try jw.objectField("irq_enabled");
-        try jw.write(self.irq_enabled);
-        try jw.objectField("loop_flag");
-        try jw.write(self.loop_flag);
-        try jw.objectField("current_addr");
-        try jw.write(self.current_addr);
-        try jw.objectField("bytes_remaining");
-        try jw.write(self.bytes_remaining);
-        try jw.objectField("read_buffer");
-        try jw.write(self.read_buffer);
-        try jw.objectField("buffer_empty");
-        try jw.write(self.buffer_empty);
-        try jw.objectField("shift_register");
-        try jw.write(self.shift_register);
-        try jw.objectField("bits_remaining");
-        try jw.write(self.bits_remaining);
-        try jw.objectField("silence_flag");
-        try jw.write(self.silence_flag);
-        try jw.objectField("needs_to_run");
-        try jw.write(self.needs_to_run);
-        try jw.objectField("needs_init");
-        try jw.write(self.needs_init);
-        try jw.objectField("transfer_requested");
-        try jw.write(self.transfer_requested);
-        try jw.endObject();
+    pub fn serialize(self: *const DMC, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+        c.mpack_write_cstr(pack, "timer");
+        self.timer.serialize(pack);
+        c.mpack_write_cstr(pack, "irq_requested");
+        c.mpack_write_bool(pack, self.irq_requested);
+        c.mpack_write_cstr(pack, "sample_addr");
+        c.mpack_write_u16(pack, self.sample_addr);
+        c.mpack_write_cstr(pack, "sample_length");
+        c.mpack_write_u16(pack, self.sample_length);
+        c.mpack_write_cstr(pack, "output_level");
+        c.mpack_write_u8(pack, self.output_level);
+        c.mpack_write_cstr(pack, "irq_enabled");
+        c.mpack_write_bool(pack, self.irq_enabled);
+        c.mpack_write_cstr(pack, "loop_flag");
+        c.mpack_write_bool(pack, self.loop_flag);
+        c.mpack_write_cstr(pack, "current_addr");
+        c.mpack_write_u16(pack, self.current_addr);
+        c.mpack_write_cstr(pack, "bytes_remaining");
+        c.mpack_write_u16(pack, self.bytes_remaining);
+        c.mpack_write_cstr(pack, "read_buffer");
+        c.mpack_write_u8(pack, self.read_buffer);
+        c.mpack_write_cstr(pack, "buffer_empty");
+        c.mpack_write_bool(pack, self.buffer_empty);
+        c.mpack_write_cstr(pack, "shift_register");
+        c.mpack_write_u8(pack, self.shift_register);
+        c.mpack_write_cstr(pack, "bits_remaining");
+        c.mpack_write_u8(pack, self.bits_remaining);
+        c.mpack_write_cstr(pack, "silence_flag");
+        c.mpack_write_bool(pack, self.silence_flag);
+        c.mpack_write_cstr(pack, "needs_to_run");
+        c.mpack_write_bool(pack, self.needs_to_run);
+        c.mpack_write_cstr(pack, "needs_init");
+        c.mpack_write_u8(pack, self.needs_init);
+        c.mpack_write_cstr(pack, "transfer_requested");
+        c.mpack_write_bool(pack, self.transfer_requested);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *DMC, value: std.json.Value) void {
-        self.timer.jsonParse(value.object.get("timer").?);
-        self.irq_requested = value.object.get("irq_requested").?.bool;
-        self.sample_addr = @intCast(value.object.get("sample_addr").?.integer);
-        self.sample_length = @intCast(value.object.get("sample_length").?.integer);
-        self.output_level = @intCast(value.object.get("output_level").?.integer);
-        self.irq_enabled = value.object.get("irq_enabled").?.bool;
-        self.loop_flag = value.object.get("loop_flag").?.bool;
-        self.current_addr = @intCast(value.object.get("current_addr").?.integer);
-        self.bytes_remaining = @intCast(value.object.get("bytes_remaining").?.integer);
-        self.read_buffer = @intCast(value.object.get("read_buffer").?.integer);
-        self.buffer_empty = value.object.get("buffer_empty").?.bool;
-        self.shift_register = @intCast(value.object.get("shift_register").?.integer);
-        self.bits_remaining = @intCast(value.object.get("bits_remaining").?.integer);
-        self.silence_flag = value.object.get("silence_flag").?.bool;
-        self.needs_to_run = value.object.get("needs_to_run").?.bool;
-        self.needs_init = @intCast(value.object.get("needs_init").?.integer);
-        self.transfer_requested = value.object.get("transfer_requested").?.bool;
+    pub fn deserialize(self: *DMC, pack: c.mpack_node_t) void {
+        self.timer.deserialize(c.mpack_node_map_cstr(pack, "timer"));
+        self.irq_requested = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "irq_requested"));
+        self.sample_addr = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "sample_addr"));
+        self.sample_length = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "sample_length"));
+        self.output_level = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "output_level"));
+        self.irq_enabled = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "irq_enabled"));
+        self.loop_flag = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "loop_flag"));
+        self.current_addr = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "current_addr"));
+        self.bytes_remaining = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "bytes_remaining"));
+        self.read_buffer = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "read_buffer"));
+        self.buffer_empty = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "buffer_empty"));
+        self.shift_register = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "shift_register"));
+        self.bits_remaining = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "bits_remaining"));
+        self.silence_flag = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "silence_flag"));
+        self.needs_to_run = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "needs_to_run"));
+        self.needs_init = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "needs_init"));
+        self.transfer_requested = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "transfer_requested"));
     }
 };

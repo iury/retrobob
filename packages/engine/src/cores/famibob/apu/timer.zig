@@ -2,6 +2,7 @@ const std = @import("std");
 const APU = @import("apu.zig");
 const AudioChannel = APU.AudioChannel;
 const Mixer = APU.Mixer;
+const c = @import("../../../c.zig");
 
 pub fn Timer(comptime channel: AudioChannel) type {
     return struct {
@@ -47,24 +48,24 @@ pub fn Timer(comptime channel: AudioChannel) type {
             self.last_output = 0;
         }
 
-        pub fn jsonStringify(self: *const @This(), jw: anytype) !void {
-            try jw.beginObject();
-            try jw.objectField("previous_cycle");
-            try jw.write(self.previous_cycle);
-            try jw.objectField("timer");
-            try jw.write(self.timer);
-            try jw.objectField("period");
-            try jw.write(self.period);
-            try jw.objectField("last_output");
-            try jw.write(self.last_output);
-            try jw.endObject();
+        pub fn serialize(self: *const @This(), pack: *c.mpack_writer_t) void {
+            c.mpack_build_map(pack);
+            c.mpack_write_cstr(pack, "previous_cycle");
+            c.mpack_write_u32(pack, self.previous_cycle);
+            c.mpack_write_cstr(pack, "timer");
+            c.mpack_write_u16(pack, self.timer);
+            c.mpack_write_cstr(pack, "period");
+            c.mpack_write_u16(pack, self.period);
+            c.mpack_write_cstr(pack, "last_output");
+            c.mpack_write_i8(pack, self.last_output);
+            c.mpack_complete_map(pack);
         }
 
-        pub fn jsonParse(self: *@This(), value: std.json.Value) void {
-            self.previous_cycle = @intCast(value.object.get("previous_cycle").?.integer);
-            self.timer = @intCast(value.object.get("timer").?.integer);
-            self.period = @intCast(value.object.get("period").?.integer);
-            self.last_output = @intCast(value.object.get("last_output").?.integer);
+        pub fn deserialize(self: *@This(), pack: c.mpack_node_t) void {
+            self.previous_cycle = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "previous_cycle"));
+            self.timer = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "timer"));
+            self.period = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "period"));
+            self.last_output = c.mpack_node_i8(c.mpack_node_map_cstr(pack, "last_output"));
         }
     };
 }

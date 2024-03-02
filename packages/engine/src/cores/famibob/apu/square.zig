@@ -3,6 +3,7 @@ const APU = @import("apu.zig");
 const AudioChannel = APU.AudioChannel;
 const Envelope = APU.Envelope;
 const Timer = APU.Timer;
+const c = @import("../../../c.zig");
 
 pub const SquareChannel = enum { one, two };
 
@@ -133,51 +134,51 @@ pub fn Square(comptime channel: SquareChannel) type {
             self.updateTargetPeriod();
         }
 
-        pub fn jsonStringify(self: *const @This(), jw: anytype) !void {
-            try jw.beginObject();
-            try jw.objectField("envelope");
-            try jw.write(self.envelope);
-            try jw.objectField("timer");
-            try jw.write(self.timer);
-            try jw.objectField("is_mmc5_square");
-            try jw.write(self.is_mmc5_square);
-            try jw.objectField("duty");
-            try jw.write(self.duty);
-            try jw.objectField("duty_pos");
-            try jw.write(self.duty_pos);
-            try jw.objectField("sweep_enabled");
-            try jw.write(self.sweep_enabled);
-            try jw.objectField("sweep_period");
-            try jw.write(self.sweep_period);
-            try jw.objectField("sweep_negate");
-            try jw.write(self.sweep_negate);
-            try jw.objectField("sweep_shift");
-            try jw.write(self.sweep_shift);
-            try jw.objectField("reload_sweep");
-            try jw.write(self.reload_sweep);
-            try jw.objectField("sweep_divider");
-            try jw.write(self.sweep_divider);
-            try jw.objectField("sweep_target_period");
-            try jw.write(self.sweep_target_period);
-            try jw.objectField("real_period");
-            try jw.write(self.real_period);
-            try jw.endObject();
+        pub fn serialize(self: *const @This(), pack: *c.mpack_writer_t) void {
+            c.mpack_build_map(pack);
+            c.mpack_write_cstr(pack, "envelope");
+            self.envelope.serialize(pack);
+            c.mpack_write_cstr(pack, "timer");
+            self.timer.serialize(pack);
+            c.mpack_write_cstr(pack, "is_mmc5_square");
+            c.mpack_write_bool(pack, self.is_mmc5_square);
+            c.mpack_write_cstr(pack, "duty");
+            c.mpack_write_u8(pack, self.duty);
+            c.mpack_write_cstr(pack, "duty_pos");
+            c.mpack_write_u8(pack, self.duty_pos);
+            c.mpack_write_cstr(pack, "sweep_enabled");
+            c.mpack_write_bool(pack, self.sweep_enabled);
+            c.mpack_write_cstr(pack, "sweep_period");
+            c.mpack_write_u8(pack, self.sweep_period);
+            c.mpack_write_cstr(pack, "sweep_negate");
+            c.mpack_write_bool(pack, self.sweep_negate);
+            c.mpack_write_cstr(pack, "sweep_shift");
+            c.mpack_write_u8(pack, self.sweep_shift);
+            c.mpack_write_cstr(pack, "reload_sweep");
+            c.mpack_write_bool(pack, self.reload_sweep);
+            c.mpack_write_cstr(pack, "sweep_divider");
+            c.mpack_write_u8(pack, self.sweep_divider);
+            c.mpack_write_cstr(pack, "sweep_target_period");
+            c.mpack_write_u32(pack, self.sweep_target_period);
+            c.mpack_write_cstr(pack, "real_period");
+            c.mpack_write_u16(pack, self.real_period);
+            c.mpack_complete_map(pack);
         }
 
-        pub fn jsonParse(self: *@This(), value: std.json.Value) void {
-            self.envelope.jsonParse(value.object.get("envelope").?);
-            self.timer.jsonParse(value.object.get("timer").?);
-            self.is_mmc5_square = value.object.get("is_mmc5_square").?.bool;
-            self.duty = @intCast(value.object.get("duty").?.integer);
-            self.duty_pos = @intCast(value.object.get("duty_pos").?.integer);
-            self.sweep_enabled = value.object.get("sweep_enabled").?.bool;
-            self.sweep_period = @intCast(value.object.get("sweep_period").?.integer);
-            self.sweep_negate = value.object.get("sweep_negate").?.bool;
-            self.sweep_shift = @intCast(value.object.get("sweep_shift").?.integer);
-            self.reload_sweep = value.object.get("reload_sweep").?.bool;
-            self.sweep_divider = @intCast(value.object.get("sweep_divider").?.integer);
-            self.sweep_target_period = @intCast(value.object.get("sweep_target_period").?.integer);
-            self.real_period = @intCast(value.object.get("real_period").?.integer);
+        pub fn deserialize(self: *@This(), pack: c.mpack_node_t) void {
+            self.envelope.deserialize(c.mpack_node_map_cstr(pack, "envelope"));
+            self.timer.deserialize(c.mpack_node_map_cstr(pack, "timer"));
+            self.is_mmc5_square = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "is_mmc5_square"));
+            self.duty = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "duty"));
+            self.duty_pos = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "duty_pos"));
+            self.sweep_enabled = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "sweep_enabled"));
+            self.sweep_period = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "sweep_period"));
+            self.sweep_negate = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "sweep_negate"));
+            self.sweep_shift = @as(u4, @truncate(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "sweep_shift"))));
+            self.reload_sweep = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "reload_sweep"));
+            self.sweep_divider = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "sweep_divider"));
+            self.sweep_target_period = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "sweep_target_period"));
+            self.real_period = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "real_period"));
         }
     };
 }

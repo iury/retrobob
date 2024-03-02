@@ -625,377 +625,188 @@ pub const APU = struct {
         };
     }
 
-    pub fn jsonStringify(self: *const @This(), jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("apu_clock");
-        try jw.write(self.apu_clock);
-        try jw.objectField("left_buf");
-        try jw.write(self.left_buf);
-        try jw.objectField("right_buf");
-        try jw.write(self.right_buf);
-        try jw.objectField("previous_left_output");
-        try jw.write(self.previous_left_output);
-        try jw.objectField("previous_right_output");
-        try jw.write(self.previous_right_output);
-        try jw.objectField("div");
-        try jw.write(self.div);
+    pub fn serialize(self: *const APU, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
 
-        try jw.objectField("ctrl");
-        try jw.beginObject();
-        try jw.objectField("ch1_on");
-        try jw.write(self.ctrl.ch1_on);
-        try jw.objectField("ch2_on");
-        try jw.write(self.ctrl.ch2_on);
-        try jw.objectField("ch3_on");
-        try jw.write(self.ctrl.ch3_on);
-        try jw.objectField("ch4_on");
-        try jw.write(self.ctrl.ch4_on);
-        try jw.objectField("enable");
-        try jw.write(self.ctrl.enable);
-        try jw.endObject();
+        c.mpack_write_cstr(pack, "wave");
+        c.mpack_start_bin(pack, @intCast(self.wave.len));
+        c.mpack_write_bytes(pack, &self.wave, self.wave.len);
+        c.mpack_finish_bin(pack);
 
-        try jw.objectField("panning");
-        try jw.beginObject();
-        try jw.objectField("ch1_right");
-        try jw.write(self.panning.ch1_right);
-        try jw.objectField("ch2_right");
-        try jw.write(self.panning.ch2_right);
-        try jw.objectField("ch3_right");
-        try jw.write(self.panning.ch3_right);
-        try jw.objectField("ch4_right");
-        try jw.write(self.panning.ch4_right);
-        try jw.objectField("ch1_left");
-        try jw.write(self.panning.ch1_left);
-        try jw.objectField("ch2_left");
-        try jw.write(self.panning.ch2_left);
-        try jw.objectField("ch3_left");
-        try jw.write(self.panning.ch3_left);
-        try jw.objectField("ch4_left");
-        try jw.write(self.panning.ch4_left);
-        try jw.endObject();
+        c.mpack_write_cstr(pack, "left_buf");
+        c.mpack_build_map(pack);
+        if (@sizeOf(usize) == 8) {
+            c.mpack_write_cstr(pack, "factor");
+            c.mpack_write_u64(pack, self.left_buf.factor);
+            c.mpack_write_cstr(pack, "offset");
+            c.mpack_write_u64(pack, self.left_buf.offset);
+        } else {
+            c.mpack_write_cstr(pack, "factor");
+            c.mpack_write_u32(pack, self.left_buf.factor);
+            c.mpack_write_cstr(pack, "offset");
+            c.mpack_write_u32(pack, self.left_buf.offset);
+        }
+        c.mpack_write_cstr(pack, "avail");
+        c.mpack_write_i32(pack, self.left_buf.avail);
+        c.mpack_write_cstr(pack, "size");
+        c.mpack_write_i32(pack, self.left_buf.size);
+        c.mpack_write_cstr(pack, "integrator");
+        c.mpack_write_i32(pack, self.left_buf.integrator);
+        c.mpack_complete_map(pack);
 
-        try jw.objectField("volume");
-        try jw.beginObject();
-        try jw.objectField("right");
-        try jw.write(self.volume.right);
-        try jw.objectField("vin_right");
-        try jw.write(self.volume.vin_right);
-        try jw.objectField("left");
-        try jw.write(self.volume.left);
-        try jw.objectField("vin_left");
-        try jw.write(self.volume.vin_left);
-        try jw.endObject();
+        c.mpack_write_cstr(pack, "right_buf");
+        c.mpack_build_map(pack);
+        if (@sizeOf(usize) == 8) {
+            c.mpack_write_cstr(pack, "factor");
+            c.mpack_write_u64(pack, self.right_buf.factor);
+            c.mpack_write_cstr(pack, "offset");
+            c.mpack_write_u64(pack, self.right_buf.offset);
+        } else {
+            c.mpack_write_cstr(pack, "factor");
+            c.mpack_write_u32(pack, self.right_buf.factor);
+            c.mpack_write_cstr(pack, "offset");
+            c.mpack_write_u32(pack, self.right_buf.offset);
+        }
+        c.mpack_write_cstr(pack, "avail");
+        c.mpack_write_i32(pack, self.right_buf.avail);
+        c.mpack_write_cstr(pack, "size");
+        c.mpack_write_i32(pack, self.right_buf.size);
+        c.mpack_write_cstr(pack, "integrator");
+        c.mpack_write_i32(pack, self.right_buf.integrator);
+        c.mpack_complete_map(pack);
 
-        try jw.objectField("ch1_sweep");
-        try jw.beginObject();
-        try jw.objectField("step");
-        try jw.write(self.ch1_sweep.step);
-        try jw.objectField("direction");
-        try jw.write(self.ch1_sweep.direction);
-        try jw.objectField("pace");
-        try jw.write(self.ch1_sweep.pace);
-        try jw.objectField("current_pace");
-        try jw.write(self.ch1_sweep.current_pace);
-        try jw.endObject();
-
-        try jw.objectField("ch1_length_timer");
-        try jw.beginObject();
-        try jw.objectField("length");
-        try jw.write(self.ch1_length_timer.length);
-        try jw.objectField("duty");
-        try jw.write(self.ch1_length_timer.duty);
-        try jw.objectField("duty_step");
-        try jw.write(self.ch1_length_timer.duty_step);
-        try jw.endObject();
-
-        try jw.objectField("ch1_envelope");
-        try jw.beginObject();
-        try jw.objectField("pace");
-        try jw.write(self.ch1_envelope.pace);
-        try jw.objectField("direction");
-        try jw.write(self.ch1_envelope.direction);
-        try jw.objectField("initial_volume");
-        try jw.write(self.ch1_envelope.initial_volume);
-        try jw.objectField("current_pace");
-        try jw.write(self.ch1_envelope.current_pace);
-        try jw.objectField("volume");
-        try jw.write(self.ch1_envelope.volume);
-        try jw.endObject();
-
-        try jw.objectField("ch1_control");
-        try jw.beginObject();
-        try jw.objectField("period_high");
-        try jw.write(self.ch1_control.period_high);
-        try jw.objectField("length_enable");
-        try jw.write(self.ch1_control.length_enable);
-        try jw.objectField("trigger");
-        try jw.write(self.ch1_control.trigger);
-        try jw.endObject();
-
-        try jw.objectField("ch1_period_low");
-        try jw.write(self.ch1_period_low);
-        try jw.objectField("ch1_period");
-        try jw.write(self.ch1_period);
-        try jw.objectField("ch1_out");
-        try jw.write(self.ch1_out);
-
-        try jw.objectField("ch2_length_timer");
-        try jw.beginObject();
-        try jw.objectField("length");
-        try jw.write(self.ch2_length_timer.length);
-        try jw.objectField("duty");
-        try jw.write(self.ch2_length_timer.duty);
-        try jw.objectField("duty_step");
-        try jw.write(self.ch2_length_timer.duty_step);
-        try jw.endObject();
-
-        try jw.objectField("ch2_envelope");
-        try jw.beginObject();
-        try jw.objectField("pace");
-        try jw.write(self.ch2_envelope.pace);
-        try jw.objectField("direction");
-        try jw.write(self.ch2_envelope.direction);
-        try jw.objectField("initial_volume");
-        try jw.write(self.ch2_envelope.initial_volume);
-        try jw.objectField("current_pace");
-        try jw.write(self.ch2_envelope.current_pace);
-        try jw.objectField("volume");
-        try jw.write(self.ch2_envelope.volume);
-        try jw.endObject();
-
-        try jw.objectField("ch2_control");
-        try jw.beginObject();
-        try jw.objectField("period_high");
-        try jw.write(self.ch2_control.period_high);
-        try jw.objectField("length_enable");
-        try jw.write(self.ch2_control.length_enable);
-        try jw.objectField("trigger");
-        try jw.write(self.ch2_control.trigger);
-        try jw.endObject();
-
-        try jw.objectField("ch2_period_low");
-        try jw.write(self.ch2_period_low);
-        try jw.objectField("ch2_period");
-        try jw.write(self.ch2_period);
-        try jw.objectField("ch2_out");
-        try jw.write(self.ch2_out);
-        try jw.objectField("ch3_enable");
-        try jw.write(self.ch3_enable);
-        try jw.objectField("ch3_length_timer");
-        try jw.write(self.ch3_length_timer);
-        try jw.objectField("ch3_output");
-        try jw.write(self.ch3_output);
-
-        try jw.objectField("ch3_control");
-        try jw.beginObject();
-        try jw.objectField("period_high");
-        try jw.write(self.ch3_control.period_high);
-        try jw.objectField("length_enable");
-        try jw.write(self.ch3_control.length_enable);
-        try jw.objectField("trigger");
-        try jw.write(self.ch3_control.trigger);
-        try jw.endObject();
-
-        try jw.objectField("ch3_period_low");
-        try jw.write(self.ch3_period_low);
-        try jw.objectField("ch3_period");
-        try jw.write(self.ch3_period);
-        try jw.objectField("ch3_out");
-        try jw.write(self.ch3_out);
-
-        try jw.objectField("wave");
-        try jw.write(self.wave);
-        try jw.objectField("wave_index");
-        try jw.write(self.wave_index);
-        try jw.objectField("next_wave");
-        try jw.write(self.next_wave);
-
-        try jw.objectField("ch4_length_timer");
-        try jw.beginObject();
-        try jw.objectField("length");
-        try jw.write(self.ch4_length_timer.length);
-        try jw.objectField("duty");
-        try jw.write(self.ch4_length_timer.duty);
-        try jw.objectField("duty_step");
-        try jw.write(self.ch4_length_timer.duty_step);
-        try jw.endObject();
-
-        try jw.objectField("ch4_envelope");
-        try jw.beginObject();
-        try jw.objectField("pace");
-        try jw.write(self.ch4_envelope.pace);
-        try jw.objectField("direction");
-        try jw.write(self.ch4_envelope.direction);
-        try jw.objectField("initial_volume");
-        try jw.write(self.ch4_envelope.initial_volume);
-        try jw.objectField("current_pace");
-        try jw.write(self.ch4_envelope.current_pace);
-        try jw.objectField("volume");
-        try jw.write(self.ch4_envelope.volume);
-        try jw.endObject();
-
-        try jw.objectField("ch4_control");
-        try jw.beginObject();
-        try jw.objectField("period_high");
-        try jw.write(self.ch4_control.period_high);
-        try jw.objectField("length_enable");
-        try jw.write(self.ch4_control.length_enable);
-        try jw.objectField("trigger");
-        try jw.write(self.ch4_control.trigger);
-        try jw.endObject();
-
-        try jw.objectField("ch4_frequency");
-        try jw.beginObject();
-        try jw.objectField("divider");
-        try jw.write(self.ch4_frequency.divider);
-        try jw.objectField("lfsr_width");
-        try jw.write(self.ch4_frequency.lfsr_width);
-        try jw.objectField("shift");
-        try jw.write(self.ch4_frequency.shift);
-        try jw.objectField("lfsr");
-        try jw.write(self.ch4_frequency.lfsr);
-        try jw.endObject();
-
-        try jw.objectField("ch4_out");
-        try jw.write(self.ch4_out);
-
-        try jw.endObject();
+        c.mpack_write_cstr(pack, "apu_clock");
+        c.mpack_write_u32(pack, @truncate(self.apu_clock));
+        c.mpack_write_cstr(pack, "previous_left_output");
+        c.mpack_write_i32(pack, self.previous_left_output);
+        c.mpack_write_cstr(pack, "previous_right_output");
+        c.mpack_write_i32(pack, self.previous_right_output);
+        c.mpack_write_cstr(pack, "div");
+        c.mpack_write_u8(pack, self.div);
+        c.mpack_write_cstr(pack, "ctrl");
+        c.mpack_write_u8(pack, @bitCast(self.ctrl));
+        c.mpack_write_cstr(pack, "panning");
+        c.mpack_write_u8(pack, @bitCast(self.panning));
+        c.mpack_write_cstr(pack, "volume");
+        c.mpack_write_u8(pack, @bitCast(self.volume));
+        c.mpack_write_cstr(pack, "ch1_sweep");
+        c.mpack_write_u16(pack, @as(u11, @bitCast(self.ch1_sweep)));
+        c.mpack_write_cstr(pack, "ch1_length_timer");
+        c.mpack_write_u16(pack, @as(u11, @bitCast(self.ch1_length_timer)));
+        c.mpack_write_cstr(pack, "ch1_envelope");
+        c.mpack_write_u16(pack, @as(u15, @bitCast(self.ch1_envelope)));
+        c.mpack_write_cstr(pack, "ch1_control");
+        c.mpack_write_u8(pack, @bitCast(self.ch1_control));
+        c.mpack_write_cstr(pack, "ch1_period_low");
+        c.mpack_write_u8(pack, self.ch1_period_low);
+        c.mpack_write_cstr(pack, "ch1_period");
+        c.mpack_write_u16(pack, self.ch1_period);
+        c.mpack_write_cstr(pack, "ch1_out");
+        c.mpack_write_u8(pack, self.ch1_out);
+        c.mpack_write_cstr(pack, "ch2_length_timer");
+        c.mpack_write_u16(pack, @as(u11, @bitCast(self.ch2_length_timer)));
+        c.mpack_write_cstr(pack, "ch2_envelope");
+        c.mpack_write_u16(pack, @as(u15, @bitCast(self.ch2_envelope)));
+        c.mpack_write_cstr(pack, "ch2_control");
+        c.mpack_write_u8(pack, @bitCast(self.ch2_control));
+        c.mpack_write_cstr(pack, "ch2_period_low");
+        c.mpack_write_u8(pack, self.ch2_period_low);
+        c.mpack_write_cstr(pack, "ch2_period");
+        c.mpack_write_u16(pack, self.ch2_period);
+        c.mpack_write_cstr(pack, "ch2_out");
+        c.mpack_write_u8(pack, self.ch2_out);
+        c.mpack_write_cstr(pack, "ch3_enable");
+        c.mpack_write_bool(pack, self.ch3_enable);
+        c.mpack_write_cstr(pack, "ch3_length_timer");
+        c.mpack_write_u8(pack, self.ch3_length_timer);
+        c.mpack_write_cstr(pack, "ch3_output");
+        c.mpack_write_u8(pack, @intFromEnum(self.ch3_output));
+        c.mpack_write_cstr(pack, "ch3_control");
+        c.mpack_write_u8(pack, @bitCast(self.ch3_control));
+        c.mpack_write_cstr(pack, "ch3_period_low");
+        c.mpack_write_u8(pack, self.ch3_period_low);
+        c.mpack_write_cstr(pack, "ch3_period");
+        c.mpack_write_u16(pack, self.ch3_period);
+        c.mpack_write_cstr(pack, "ch3_out");
+        c.mpack_write_u8(pack, self.ch3_out);
+        c.mpack_write_cstr(pack, "wave_index");
+        c.mpack_write_u32(pack, @truncate(self.wave_index));
+        c.mpack_write_cstr(pack, "next_wave");
+        c.mpack_write_u8(pack, self.next_wave);
+        c.mpack_write_cstr(pack, "ch4_length_timer");
+        c.mpack_write_u16(pack, @as(u11, @bitCast(self.ch4_length_timer)));
+        c.mpack_write_cstr(pack, "ch4_envelope");
+        c.mpack_write_u16(pack, @as(u15, @bitCast(self.ch4_envelope)));
+        c.mpack_write_cstr(pack, "ch4_control");
+        c.mpack_write_u8(pack, @bitCast(self.ch4_control));
+        c.mpack_write_cstr(pack, "ch4_frequency");
+        c.mpack_write_u32(pack, @as(u24, @bitCast(self.ch4_frequency)));
+        c.mpack_write_cstr(pack, "ch4_out");
+        c.mpack_write_u8(pack, self.ch4_out);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *APU, value: std.json.Value) void {
+    pub fn deserialize(self: *APU, pack: c.mpack_node_t) void {
         @memset(&self.wave, 0);
-        for (value.object.get("wave").?.array.items, 0..) |v, i| {
-            self.wave[i] = @intCast(v.integer);
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "wave"), &self.wave, self.wave.len);
+
+        const left_buf = c.mpack_node_map_cstr(pack, "left_buf");
+        if (@sizeOf(usize) == 8) {
+            self.left_buf.factor = c.mpack_node_u64(c.mpack_node_map_cstr(left_buf, "factor"));
+            self.left_buf.offset = c.mpack_node_u64(c.mpack_node_map_cstr(left_buf, "offset"));
+        } else {
+            self.left_buf.factor = c.mpack_node_u32(c.mpack_node_map_cstr(left_buf, "factor"));
+            self.left_buf.offset = c.mpack_node_u32(c.mpack_node_map_cstr(left_buf, "offset"));
         }
+        self.left_buf.avail = c.mpack_node_i32(c.mpack_node_map_cstr(left_buf, "avail"));
+        self.left_buf.size = c.mpack_node_i32(c.mpack_node_map_cstr(left_buf, "size"));
+        self.left_buf.integrator = c.mpack_node_i32(c.mpack_node_map_cstr(left_buf, "integrator"));
 
-        self.apu_clock = @intCast(value.object.get("apu_clock").?.integer);
-        self.previous_left_output = @intCast(value.object.get("previous_left_output").?.integer);
-        self.previous_right_output = @intCast(value.object.get("previous_right_output").?.integer);
-        self.div = @intCast(value.object.get("div").?.integer);
+        const right_buf = c.mpack_node_map_cstr(pack, "right_buf");
+        if (@sizeOf(usize) == 8) {
+            self.right_buf.factor = c.mpack_node_u64(c.mpack_node_map_cstr(right_buf, "factor"));
+            self.right_buf.offset = c.mpack_node_u64(c.mpack_node_map_cstr(right_buf, "offset"));
+        } else {
+            self.right_buf.factor = c.mpack_node_u32(c.mpack_node_map_cstr(right_buf, "factor"));
+            self.right_buf.offset = c.mpack_node_u32(c.mpack_node_map_cstr(right_buf, "offset"));
+        }
+        self.right_buf.avail = c.mpack_node_i32(c.mpack_node_map_cstr(right_buf, "avail"));
+        self.right_buf.size = c.mpack_node_i32(c.mpack_node_map_cstr(right_buf, "size"));
+        self.right_buf.integrator = c.mpack_node_i32(c.mpack_node_map_cstr(right_buf, "integrator"));
 
-        const left_buf = value.object.get("left_buf").?;
-        self.left_buf.factor = @intCast(left_buf.object.get("factor").?.integer);
-        self.left_buf.offset = @intCast(left_buf.object.get("offset").?.integer);
-        self.left_buf.avail = @intCast(left_buf.object.get("avail").?.integer);
-        self.left_buf.size = @intCast(left_buf.object.get("size").?.integer);
-        self.left_buf.integrator = @intCast(left_buf.object.get("integrator").?.integer);
-
-        const right_buf = value.object.get("right_buf").?;
-        self.right_buf.factor = @intCast(right_buf.object.get("factor").?.integer);
-        self.right_buf.offset = @intCast(right_buf.object.get("offset").?.integer);
-        self.right_buf.avail = @intCast(right_buf.object.get("avail").?.integer);
-        self.right_buf.size = @intCast(right_buf.object.get("size").?.integer);
-        self.right_buf.integrator = @intCast(right_buf.object.get("integrator").?.integer);
-
-        const ctrl = value.object.get("ctrl").?;
-        self.ctrl.ch1_on = ctrl.object.get("ch1_on").?.bool;
-        self.ctrl.ch2_on = ctrl.object.get("ch2_on").?.bool;
-        self.ctrl.ch3_on = ctrl.object.get("ch3_on").?.bool;
-        self.ctrl.ch4_on = ctrl.object.get("ch4_on").?.bool;
-        self.ctrl.enable = ctrl.object.get("enable").?.bool;
-
-        const panning = value.object.get("panning").?;
-        self.panning.ch1_right = panning.object.get("ch1_right").?.bool;
-        self.panning.ch2_right = panning.object.get("ch2_right").?.bool;
-        self.panning.ch3_right = panning.object.get("ch3_right").?.bool;
-        self.panning.ch4_right = panning.object.get("ch4_right").?.bool;
-        self.panning.ch1_left = panning.object.get("ch1_left").?.bool;
-        self.panning.ch2_left = panning.object.get("ch2_left").?.bool;
-        self.panning.ch3_left = panning.object.get("ch3_left").?.bool;
-        self.panning.ch4_left = panning.object.get("ch4_left").?.bool;
-
-        const volume = value.object.get("volume").?;
-        self.volume.right = @intCast(volume.object.get("right").?.integer);
-        self.volume.vin_right = @intCast(volume.object.get("vin_right").?.integer);
-        self.volume.left = @intCast(volume.object.get("left").?.integer);
-        self.volume.vin_left = @intCast(volume.object.get("vin_left").?.integer);
-
-        const ch1_sweep = value.object.get("ch1_sweep").?;
-        self.ch1_sweep.step = @intCast(ch1_sweep.object.get("step").?.integer);
-        self.ch1_sweep.direction = std.meta.stringToEnum(@TypeOf(self.ch1_sweep.direction), ch1_sweep.object.get("direction").?.string).?;
-        self.ch1_sweep.pace = @intCast(ch1_sweep.object.get("pace").?.integer);
-        self.ch1_sweep.current_pace = @intCast(ch1_sweep.object.get("current_pace").?.integer);
-
-        const ch1_length_timer = value.object.get("ch1_length_timer").?;
-        self.ch1_length_timer.length = @intCast(ch1_length_timer.object.get("length").?.integer);
-        self.ch1_length_timer.duty = @intCast(ch1_length_timer.object.get("duty").?.integer);
-        self.ch1_length_timer.duty_step = @intCast(ch1_length_timer.object.get("duty_step").?.integer);
-
-        const ch1_envelope = value.object.get("ch1_envelope").?;
-        self.ch1_envelope.pace = @intCast(ch1_envelope.object.get("pace").?.integer);
-        self.ch1_envelope.direction = std.meta.stringToEnum(@TypeOf(self.ch1_envelope.direction), ch1_envelope.object.get("direction").?.string).?;
-        self.ch1_envelope.initial_volume = @intCast(ch1_envelope.object.get("initial_volume").?.integer);
-        self.ch1_envelope.current_pace = @intCast(ch1_envelope.object.get("current_pace").?.integer);
-        self.ch1_envelope.volume = @intCast(ch1_envelope.object.get("volume").?.integer);
-
-        const ch1_control = value.object.get("ch1_control").?;
-        self.ch1_control.period_high = @intCast(ch1_control.object.get("period_high").?.integer);
-        self.ch1_control.length_enable = ch1_control.object.get("length_enable").?.bool;
-        self.ch1_control.trigger = ch1_control.object.get("trigger").?.bool;
-
-        self.ch1_period_low = @intCast(value.object.get("ch1_period_low").?.integer);
-        self.ch1_period = @intCast(value.object.get("ch1_period").?.integer);
-        self.ch1_out = @intCast(value.object.get("ch1_out").?.integer);
-
-        const ch2_length_timer = value.object.get("ch2_length_timer").?;
-        self.ch2_length_timer.length = @intCast(ch2_length_timer.object.get("length").?.integer);
-        self.ch2_length_timer.duty = @intCast(ch2_length_timer.object.get("duty").?.integer);
-        self.ch2_length_timer.duty_step = @intCast(ch2_length_timer.object.get("duty_step").?.integer);
-
-        const ch2_envelope = value.object.get("ch2_envelope").?;
-        self.ch2_envelope.pace = @intCast(ch2_envelope.object.get("pace").?.integer);
-        self.ch2_envelope.direction = std.meta.stringToEnum(@TypeOf(self.ch2_envelope.direction), ch2_envelope.object.get("direction").?.string).?;
-        self.ch2_envelope.initial_volume = @intCast(ch2_envelope.object.get("initial_volume").?.integer);
-        self.ch2_envelope.current_pace = @intCast(ch2_envelope.object.get("current_pace").?.integer);
-        self.ch2_envelope.volume = @intCast(ch2_envelope.object.get("volume").?.integer);
-
-        const ch2_control = value.object.get("ch2_control").?;
-        self.ch2_control.period_high = @intCast(ch2_control.object.get("period_high").?.integer);
-        self.ch2_control.length_enable = ch2_control.object.get("length_enable").?.bool;
-        self.ch2_control.trigger = ch2_control.object.get("trigger").?.bool;
-
-        self.ch2_period_low = @intCast(value.object.get("ch2_period_low").?.integer);
-        self.ch2_period = @intCast(value.object.get("ch2_period").?.integer);
-        self.ch2_out = @intCast(value.object.get("ch2_out").?.integer);
-        self.ch3_enable = value.object.get("ch3_enable").?.bool;
-        self.ch3_length_timer = @intCast(value.object.get("ch3_length_timer").?.integer);
-        self.ch3_output = std.meta.stringToEnum(@TypeOf(self.ch3_output), value.object.get("ch3_output").?.string).?;
-
-        const ch3_control = value.object.get("ch3_control").?;
-        self.ch3_control.period_high = @intCast(ch3_control.object.get("period_high").?.integer);
-        self.ch3_control.length_enable = ch3_control.object.get("length_enable").?.bool;
-        self.ch3_control.trigger = ch3_control.object.get("trigger").?.bool;
-
-        self.ch3_period_low = @intCast(value.object.get("ch3_period_low").?.integer);
-        self.ch3_period = @intCast(value.object.get("ch3_period").?.integer);
-        self.ch3_out = @intCast(value.object.get("ch3_out").?.integer);
-
-        self.wave_index = @intCast(value.object.get("wave_index").?.integer);
-        self.next_wave = @intCast(value.object.get("next_wave").?.integer);
-
-        const ch4_length_timer = value.object.get("ch4_length_timer").?;
-        self.ch4_length_timer.length = @intCast(ch4_length_timer.object.get("length").?.integer);
-        self.ch4_length_timer.duty = @intCast(ch4_length_timer.object.get("duty").?.integer);
-        self.ch4_length_timer.duty_step = @intCast(ch4_length_timer.object.get("duty_step").?.integer);
-
-        const ch4_envelope = value.object.get("ch4_envelope").?;
-        self.ch4_envelope.pace = @intCast(ch4_envelope.object.get("pace").?.integer);
-        self.ch4_envelope.direction = std.meta.stringToEnum(@TypeOf(self.ch4_envelope.direction), ch4_envelope.object.get("direction").?.string).?;
-        self.ch4_envelope.initial_volume = @intCast(ch4_envelope.object.get("initial_volume").?.integer);
-        self.ch4_envelope.current_pace = @intCast(ch4_envelope.object.get("current_pace").?.integer);
-        self.ch4_envelope.volume = @intCast(ch4_envelope.object.get("volume").?.integer);
-
-        const ch4_control = value.object.get("ch4_control").?;
-        self.ch4_control.period_high = @intCast(ch4_control.object.get("period_high").?.integer);
-        self.ch4_control.length_enable = ch4_control.object.get("length_enable").?.bool;
-        self.ch4_control.trigger = ch4_control.object.get("trigger").?.bool;
-
-        const ch4_frequency = value.object.get("ch4_frequency").?;
-        self.ch4_frequency.divider = @intCast(ch4_frequency.object.get("divider").?.integer);
-        self.ch4_frequency.lfsr_width = std.meta.stringToEnum(@TypeOf(self.ch4_frequency.lfsr_width), ch4_frequency.object.get("lfsr_width").?.string).?;
-        self.ch4_frequency.shift = @intCast(ch4_frequency.object.get("shift").?.integer);
-        self.ch4_frequency.lfsr = @intCast(ch4_frequency.object.get("lfsr").?.integer);
-
-        self.ch4_out = @intCast(value.object.get("ch4_out").?.integer);
+        self.apu_clock = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "apu_clock"));
+        self.previous_left_output = c.mpack_node_i32(c.mpack_node_map_cstr(pack, "previous_left_output"));
+        self.previous_right_output = c.mpack_node_i32(c.mpack_node_map_cstr(pack, "previous_right_output"));
+        self.div = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "div"));
+        self.ctrl = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ctrl")));
+        self.panning = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "panning")));
+        self.volume = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "volume")));
+        self.ch1_sweep = @bitCast(@as(u11, @truncate(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ch1_sweep")))));
+        self.ch1_length_timer = @bitCast(@as(u11, @truncate(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ch1_length_timer")))));
+        self.ch1_envelope = @bitCast(@as(u15, @truncate(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ch1_envelope")))));
+        self.ch1_control = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch1_control")));
+        self.ch1_period_low = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch1_period_low"));
+        self.ch1_period = @bitCast(@as(u11, @truncate(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ch1_period")))));
+        self.ch1_out = @truncate(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch1_out")));
+        self.ch2_length_timer = @bitCast(@as(u11, @truncate(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ch2_length_timer")))));
+        self.ch2_envelope = @bitCast(@as(u15, @truncate(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ch2_envelope")))));
+        self.ch2_control = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch2_control")));
+        self.ch2_period_low = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch2_period_low"));
+        self.ch2_period = @bitCast(@as(u11, @truncate(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ch2_period")))));
+        self.ch2_out = @truncate(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch2_out")));
+        self.ch3_enable = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "ch3_enable"));
+        self.ch3_length_timer = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch3_length_timer")));
+        self.ch3_output = @enumFromInt(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch3_output")));
+        self.ch3_control = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch3_control")));
+        self.ch3_period_low = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch3_period_low"));
+        self.ch3_period = @bitCast(@as(u11, @truncate(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ch3_period")))));
+        self.ch3_out = @truncate(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch3_out")));
+        self.wave_index = c.mpack_node_u32(c.mpack_node_map_cstr(pack, "wave_index"));
+        self.next_wave = @truncate(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "next_wave")));
+        self.ch4_length_timer = @bitCast(@as(u11, @truncate(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ch4_length_timer")))));
+        self.ch4_envelope = @bitCast(@as(u15, @truncate(c.mpack_node_u16(c.mpack_node_map_cstr(pack, "ch4_envelope")))));
+        self.ch4_control = @bitCast(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch4_control")));
+        self.ch4_frequency = @bitCast(@as(u24, @truncate(c.mpack_node_u32(c.mpack_node_map_cstr(pack, "ch4_frequency")))));
+        self.ch4_out = @truncate(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "ch4_out")));
     }
 };

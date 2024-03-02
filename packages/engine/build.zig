@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 
 const blipbuf = @import("external/blip-buf/build.zig");
 const raylib = @import("external/raylib/src/build.zig");
+const mpack = @import("external/mpack/build.zig");
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -10,6 +11,9 @@ pub fn build(b: *std.Build) !void {
 
     const blip = blipbuf.addBlipBuf(b, target, .ReleaseFast);
     b.installArtifact(blip);
+
+    const pack = mpack.addMPack(b, target, .ReleaseFast);
+    b.installArtifact(pack);
 
     const ray = try raylib.addRaylib(b, target, .ReleaseFast, .{ .rmodels = false });
     ray.installHeader("external/raylib/src/raylib.h", "raylib.h");
@@ -32,6 +36,7 @@ pub fn build(b: *std.Build) !void {
         }
 
         wasm.linkLibrary(blip);
+        wasm.linkLibrary(pack);
         wasm.linkLibrary(ray);
 
         b.installArtifact(wasm);
@@ -45,6 +50,7 @@ pub fn build(b: *std.Build) !void {
         });
 
         exe.linkLibrary(blip);
+        exe.linkLibrary(pack);
         exe.linkLibrary(ray);
 
         b.installArtifact(exe);
@@ -61,6 +67,7 @@ pub fn build(b: *std.Build) !void {
     });
 
     unit_tests.linkLibrary(blip);
+    unit_tests.linkLibrary(pack);
     unit_tests.linkLibrary(ray);
 
     const test_step = b.step("test", "Run unit tests");

@@ -138,34 +138,49 @@ pub const Mixer = struct {
         self.updateRates(true);
     }
 
-    pub fn jsonStringify(self: *const Mixer, jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("region");
-        try jw.write(self.region);
-        try jw.objectField("blip_buf");
-        try jw.write(self.blip_buf);
-        try jw.objectField("sample_rate");
-        try jw.write(self.sample_rate);
-        try jw.objectField("previous_output");
-        try jw.write(self.previous_output);
-        try jw.objectField("clock_rate");
-        try jw.write(self.clock_rate);
-        try jw.objectField("current_output");
-        try jw.write(self.current_output);
+    pub fn serialize(self: *const Mixer, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
 
-        try jw.objectField("channel_output");
-        try jw.beginArray();
-        for (0..self.channel_output.len) |i| {
-            const arr = self.channel_output[i][0..];
-            var pos = arr.len;
-            while (pos > 0) : (pos -= 1) {
-                if (arr[pos - 1] != 0) break;
-            }
-            try jw.write(arr[0..pos]);
+        c.mpack_write_cstr(pack, "blip_buf");
+        c.mpack_build_map(pack);
+        if (@sizeOf(usize) == 8) {
+            c.mpack_write_cstr(pack, "factor");
+            c.mpack_write_u64(pack, self.blip_buf.factor);
+            c.mpack_write_cstr(pack, "offset");
+            c.mpack_write_u64(pack, self.blip_buf.offset);
+        } else {
+            c.mpack_write_cstr(pack, "factor");
+            c.mpack_write_u32(pack, self.blip_buf.factor);
+            c.mpack_write_cstr(pack, "offset");
+            c.mpack_write_u32(pack, self.blip_buf.offset);
         }
-        try jw.endArray();
+        c.mpack_write_cstr(pack, "avail");
+        c.mpack_write_i32(pack, self.blip_buf.avail);
+        c.mpack_write_cstr(pack, "size");
+        c.mpack_write_i32(pack, self.blip_buf.size);
+        c.mpack_write_cstr(pack, "integrator");
+        c.mpack_write_i32(pack, self.blip_buf.integrator);
+        c.mpack_complete_map(pack);
 
-        try jw.objectField("timestamps");
+        c.mpack_write_cstr(pack, "previous_output");
+        c.mpack_write_i16(pack, self.previous_output);
+
+        c.mpack_write_cstr(pack, "current_output");
+        c.mpack_build_array(pack);
+        for (self.current_output) |item| c.mpack_write_i16(pack, item);
+        c.mpack_complete_array(pack);
+
+        c.mpack_write_cstr(pack, "channel_output");
+        c.mpack_build_array(pack);
+        for (0..self.channel_output.len) |i| {
+            c.mpack_build_array(pack);
+            for (self.channel_output[i]) |item| c.mpack_write_i16(pack, item);
+            c.mpack_complete_array(pack);
+        }
+        c.mpack_complete_array(pack);
+
+        c.mpack_write_cstr(pack, "timestamps");
+        c.mpack_build_array(pack);
         var stamps = std.ArrayList(u32).init(std.heap.c_allocator);
         defer stamps.deinit();
         var iter = self.timestamps.iterator();
@@ -173,40 +188,53 @@ pub const Mixer = struct {
             const stamp = item.key_ptr.*;
             stamps.append(stamp) catch unreachable;
         }
-        try jw.write(stamps.items);
+        for (stamps.items) |item| c.mpack_write_u32(pack, item);
+        c.mpack_complete_array(pack);
 
-        try jw.endObject();
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *Mixer, value: std.json.Value) void {
-        self.region = std.meta.stringToEnum(Region, value.object.get("region").?.string).?;
-        self.sample_rate = @intCast(value.object.get("sample_rate").?.integer);
-        self.previous_output = @intCast(value.object.get("previous_output").?.integer);
-        self.clock_rate = @intCast(value.object.get("clock_rate").?.integer);
-
-        const buf = @as(*c.struct_blip_t, @ptrCast(@alignCast(self.blip_buf)));
-        c.blip_clear(buf);
-        const blip = value.object.get("blip_buf").?.object;
-        self.blip_buf.factor = @intCast(blip.get("factor").?.integer);
-        self.blip_buf.offset = @intCast(blip.get("offset").?.integer);
-        self.blip_buf.avail = @intCast(blip.get("avail").?.integer);
-        self.blip_buf.size = @intCast(blip.get("size").?.integer);
-        self.blip_buf.integrator = @intCast(blip.get("integrator").?.integer);
-
-        self.timestamps.clearRetainingCapacity();
-        for (value.object.get("timestamps").?.array.items) |v| {
-            self.timestamps.put(@intCast(v.integer), {}) catch unreachable;
+    pub fn deserialize(self: *Mixer, pack: c.mpack_node_t) void {
+        const blip_buf = c.mpack_node_map_cstr(pack, "blip_buf");
+        {
+            if (@sizeOf(usize) == 8) {
+                self.blip_buf.factor = c.mpack_node_u64(c.mpack_node_map_cstr(blip_buf, "factor"));
+                self.blip_buf.offset = c.mpack_node_u64(c.mpack_node_map_cstr(blip_buf, "offset"));
+            } else {
+                self.blip_buf.factor = c.mpack_node_u32(c.mpack_node_map_cstr(blip_buf, "factor"));
+                self.blip_buf.offset = c.mpack_node_u32(c.mpack_node_map_cstr(blip_buf, "offset"));
+            }
+            self.blip_buf.avail = c.mpack_node_i32(c.mpack_node_map_cstr(blip_buf, "avail"));
+            self.blip_buf.size = c.mpack_node_i32(c.mpack_node_map_cstr(blip_buf, "size"));
+            self.blip_buf.integrator = c.mpack_node_i32(c.mpack_node_map_cstr(blip_buf, "integrator"));
         }
 
-        @memset(self.current_output[0..], 0);
-        for (value.object.get("current_output").?.array.items, 0..) |v, i| {
-            self.current_output[i] = @intCast(v.integer);
+        self.previous_output = c.mpack_node_i16(c.mpack_node_map_cstr(pack, "previous_output"));
+
+        {
+            @memset(&self.current_output, 0);
+            const current_output = c.mpack_node_map_cstr(pack, "current_output");
+            const len = c.mpack_node_array_length(current_output);
+            for (0..len) |i| {
+                self.current_output[i] = c.mpack_node_i16(c.mpack_node_array_at(current_output, i));
+            }
         }
 
         for (0..5) |i| {
-            @memset(self.channel_output[i][0..], 0);
-            for (value.object.get("channel_output").?.array.items[i].array.items, 0..) |v, j| {
-                self.channel_output[i][j] = @intCast(v.integer);
+            @memset(&self.channel_output[i], 0);
+            const output = c.mpack_node_array_at(c.mpack_node_map_cstr(pack, "channel_output"), i);
+            const len = c.mpack_node_array_length(output);
+            for (0..len) |j| {
+                self.channel_output[i][j] = c.mpack_node_i16(c.mpack_node_array_at(output, j));
+            }
+        }
+
+        {
+            self.timestamps.clearRetainingCapacity();
+            const stamps = c.mpack_node_map_cstr(pack, "timestamps");
+            const len = c.mpack_node_array_length(stamps);
+            for (0..len) |i| {
+                self.timestamps.put(c.mpack_node_u32(c.mpack_node_array_at(stamps, i)), {}) catch unreachable;
             }
         }
     }

@@ -2,6 +2,7 @@ const std = @import("std");
 const APU = @import("apu.zig");
 const Envelope = APU.Envelope;
 const Timer = APU.Timer;
+const c = @import("../../../c.zig");
 
 pub const Noise = struct {
     pub const lookup_table_ntsc: []const u16 = &[_]u16{ 4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068 };
@@ -62,23 +63,23 @@ pub const Noise = struct {
         self.mode_flag = false;
     }
 
-    pub fn jsonStringify(self: *const Noise, jw: anytype) !void {
-        try jw.beginObject();
-        try jw.objectField("envelope");
-        try jw.write(self.envelope);
-        try jw.objectField("timer");
-        try jw.write(self.timer);
-        try jw.objectField("shift_register");
-        try jw.write(self.shift_register);
-        try jw.objectField("mode_flag");
-        try jw.write(self.mode_flag);
-        try jw.endObject();
+    pub fn serialize(self: *const Noise, pack: *c.mpack_writer_t) void {
+        c.mpack_build_map(pack);
+        c.mpack_write_cstr(pack, "envelope");
+        self.envelope.serialize(pack);
+        c.mpack_write_cstr(pack, "timer");
+        self.timer.serialize(pack);
+        c.mpack_write_cstr(pack, "shift_register");
+        c.mpack_write_u16(pack, self.shift_register);
+        c.mpack_write_cstr(pack, "mode_flag");
+        c.mpack_write_bool(pack, self.mode_flag);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(self: *Noise, value: std.json.Value) void {
-        self.envelope.jsonParse(value.object.get("envelope").?);
-        self.timer.jsonParse(value.object.get("timer").?);
-        self.shift_register = @intCast(value.object.get("shift_register").?.integer);
-        self.mode_flag = value.object.get("mode_flag").?.bool;
+    pub fn deserialize(self: *Noise, pack: c.mpack_node_t) void {
+        self.envelope.deserialize(c.mpack_node_map_cstr(pack, "envelope"));
+        self.timer.deserialize(c.mpack_node_map_cstr(pack, "timer"));
+        self.shift_register = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "shift_register"));
+        self.mode_flag = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "mode_flag"));
     }
 };

@@ -1,5 +1,6 @@
 const std = @import("std");
 const Memory = @import("../../memory.zig").Memory;
+const c = @import("../../c.zig");
 
 pub const MemoryBus = struct {
     allocator: std.mem.Allocator,
@@ -78,19 +79,20 @@ pub const MemoryBus = struct {
         }
     }
 
-    fn jsonStringify(ctx: *anyopaque, allocator: std.mem.Allocator) !std.json.Value {
-        const self: *@This() = @ptrCast(@alignCast(ctx));
-        var data = std.json.ObjectMap.init(allocator);
-        try data.put("ram", .{ .string = self.ram });
-        return .{ .object = data };
+    pub fn serialize(ctx: *const anyopaque, pack: *c.mpack_writer_t) void {
+        const self: *const @This() = @ptrCast(@alignCast(ctx));
+        c.mpack_build_map(pack);
+        c.mpack_write_cstr(pack, "ram");
+        c.mpack_start_bin(pack, @intCast(self.ram.len));
+        c.mpack_write_bytes(pack, self.ram.ptr, self.ram.len);
+        c.mpack_finish_bin(pack);
+        c.mpack_complete_map(pack);
     }
 
-    pub fn jsonParse(ctx: *anyopaque, value: std.json.Value) void {
+    pub fn deserialize(ctx: *anyopaque, pack: c.mpack_node_t) void {
         const self: *@This() = @ptrCast(@alignCast(ctx));
         @memset(self.ram, 0);
-        for (value.object.get("ram").?.array.items, 0..) |v, i| {
-            self.ram[i] = @intCast(v.integer);
-        }
+        _ = c.mpack_node_copy_data(c.mpack_node_map_cstr(pack, "ram"), self.ram.ptr, self.ram.len);
     }
 
     pub fn memory(self: *MemoryBus) Memory(u16, u8) {
@@ -100,8 +102,8 @@ pub const MemoryBus = struct {
                 .read = read,
                 .write = write,
                 .deinit = deinitMemory,
-                .jsonParse = jsonParse,
-                .jsonStringify = jsonStringify,
+                .serialize = serialize,
+                .deserialize = deserialize,
             },
         };
     }
