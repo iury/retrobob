@@ -16,11 +16,6 @@ const Addressing = @import("../opcode.zig").Addressing;
 // Absolute,X    LSR $4400,X   $5E  3   7
 
 pub fn lsr(self: *CPU, addressing: Addressing) void {
-    const S = struct {
-        var address: u16 = 0;
-        var value: u8 = 0;
-    };
-
     switch (addressing) {
         .acc => |_| {
             self.c = (self.acc & 0x1) > 0;
@@ -30,53 +25,53 @@ pub fn lsr(self: *CPU, addressing: Addressing) void {
             return;
         },
         .zpg => |v| {
-            S.address = v;
+            self.inst_address = v;
             if (self.cycle_counter == 3) {
-                S.value = self.read(v);
+                self.inst_value = self.read(v);
                 self.next_cycle = .write;
                 return;
             } else if (self.cycle_counter == 4) {
-                self.write(v, S.value);
+                self.write(v, self.inst_value);
                 self.next_cycle = .write;
                 return;
             }
         },
         .zpx, .zpy => |v| {
-            S.address = v;
+            self.inst_address = v;
             if (self.cycle_counter == 4) {
-                S.value = self.read(v);
+                self.inst_value = self.read(v);
                 self.next_cycle = .write;
                 return;
             } else if (self.cycle_counter == 5) {
-                self.write(v, S.value);
+                self.write(v, self.inst_value);
                 self.next_cycle = .write;
                 return;
             }
         },
         .abs => |v| {
-            S.address = v;
+            self.inst_address = v;
             if (self.cycle_counter == 4) {
-                S.value = self.read(v);
+                self.inst_value = self.read(v);
                 self.next_cycle = .write;
                 return;
             } else if (self.cycle_counter == 5) {
-                self.write(v, S.value);
+                self.write(v, self.inst_value);
                 self.next_cycle = .write;
                 return;
             }
         },
         .abx, .aby => |v| {
-            S.address = v.@"0";
+            self.inst_address = v.@"0";
             if (self.cycle_counter == 4) {
                 _ = self.read(v.@"0");
                 self.next_cycle = .read;
                 return;
             } else if (self.cycle_counter == 5) {
-                S.value = self.read(v.@"0");
+                self.inst_value = self.read(v.@"0");
                 self.next_cycle = .write;
                 return;
             } else if (self.cycle_counter == 6) {
-                self.write(v.@"0", S.value);
+                self.write(v.@"0", self.inst_value);
                 self.next_cycle = .write;
                 return;
             }
@@ -84,10 +79,10 @@ pub fn lsr(self: *CPU, addressing: Addressing) void {
         else => {},
     }
 
-    var b = S.value;
+    var b = self.inst_value;
     self.c = (b & 0x1) > 0;
     b >>= 1;
-    self.write(S.address, b);
+    self.write(self.inst_address, b);
     self.z = b == 0;
     self.n = (b & 0x80) > 0;
 }

@@ -11,7 +11,7 @@ pub fn Clock(comptime T: anytype, comptime region: Region) type {
         handler: *T,
         region: Region = region,
 
-        frame_cycles: u32 = if (region == .ntsc) 357_364 else 531_960,
+        frame_cycles: u32 = if (region == .ntsc) 357_366 else 531_960,
         cpu_divider: u32 = if (region == .ntsc) 12 else 16,
         ppu_divider: u32 = if (region == .ntsc) 4 else 5,
         cpu_counter: u32 = 0,
@@ -23,7 +23,7 @@ pub fn Clock(comptime T: anytype, comptime region: Region) type {
             self.ppu_counter = 0;
 
             if (self.region == .ntsc) {
-                self.frame_cycles = 357_364;
+                self.frame_cycles = 357_366;
                 self.cpu_divider = 12;
                 self.ppu_divider = 4;
             } else {

@@ -9,23 +9,16 @@ const Addressing = @import("../opcode.zig").Addressing;
 // MODE          SYNTAX        HEX LEN TIM
 // Implied       ---           ---  -   7
 
-const IRQType = enum { nmi, rst, irq };
-
 pub fn irq(self: *CPU) void {
-    const S = struct {
-        var irq_type: IRQType = .nmi;
-        var cycle: u8 = 0;
-    };
+    self.irq_cycle += 1;
 
-    S.cycle += 1;
-
-    if (S.cycle == 1) {
+    if (self.irq_cycle == 1) {
         if (self.rst_requested) {
-            S.irq_type = .rst;
+            self.irq_type = .rst;
         } else if (self.nmi_requested) {
-            S.irq_type = .nmi;
+            self.irq_type = .nmi;
         } else {
-            S.irq_type = .irq;
+            self.irq_type = .irq;
         }
 
         self.b = false;
@@ -33,27 +26,27 @@ pub fn irq(self: *CPU) void {
         _ = self.fetch();
         self.pc -%= 1;
         return;
-    } else if (S.cycle == 2) {
+    } else if (self.irq_cycle == 2) {
         _ = self.fetch();
         self.pc -%= 1;
         return;
-    } else if (S.cycle == 3) {
+    } else if (self.irq_cycle == 3) {
         if (!self.rst_requested) self.write(0x100 | @as(u16, self.sp), @truncate(self.pc >> 8));
         self.sp -%= 1;
         return;
-    } else if (S.cycle == 4) {
+    } else if (self.irq_cycle == 4) {
         if (!self.rst_requested) self.write(0x100 | @as(u16, self.sp), @truncate(self.pc & 0xff));
         self.sp -%= 1;
         return;
-    } else if (S.cycle == 5) {
+    } else if (self.irq_cycle == 5) {
         if (!self.rst_requested) self.write(0x100 | @as(u16, self.sp), self.getP() & ~@as(u8, 0x10));
         self.sp -%= 1;
         return;
-    } else if (S.cycle == 6) {
+    } else if (self.irq_cycle == 6) {
         var pch: u16 = 0;
-        if (S.irq_type == .rst) {
+        if (self.irq_type == .rst) {
             pch = 0xfffd;
-        } else if (S.irq_type == .nmi) {
+        } else if (self.irq_type == .nmi) {
             pch = 0xfffb;
         } else {
             pch = 0xffff;
@@ -62,13 +55,13 @@ pub fn irq(self: *CPU) void {
         self.pc |= self.read(pch);
         return;
     } else {
-        S.cycle = 0;
+        self.irq_cycle = 0;
         var pcl: u16 = 0;
         self.irq_occurred = false;
-        if (S.irq_type == .rst) {
+        if (self.irq_type == .rst) {
             self.rst_requested = false;
             pcl = 0xfffc;
-        } else if (S.irq_type == .nmi) {
+        } else if (self.irq_type == .nmi) {
             self.nmi_requested = false;
             pcl = 0xfffa;
         } else {

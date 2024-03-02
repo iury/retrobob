@@ -162,8 +162,9 @@ pub const PPU = struct {
             .vram = try allocator.alloc(u8, 0x4000),
             .bus = bus,
         };
-        @memset(instance.vram, 0);
         @memset(instance.framebuf, 0);
+        @memset(instance.output, 0);
+        @memset(instance.vram, 0);
         return instance;
     }
 
@@ -730,6 +731,9 @@ pub const PPU = struct {
         self.hdmad = 0x1ff0;
         self.hdmas = 0;
         self.hdma_cpu_cycles = 0;
+        @memset(self.framebuf, 0);
+        @memset(self.output, 0);
+        @memset(self.vram, 0);
     }
 
     pub fn memory(self: *PPU) Memory(u16, u8) {

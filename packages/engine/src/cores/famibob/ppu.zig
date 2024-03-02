@@ -162,6 +162,7 @@ pub const PPU = struct {
     oam_dma: ?u16 = null,
     booting: ?u32 = 0,
 
+    output: []u32,
     framebuf: []u32,
 
     pub fn init(allocator: std.mem.Allocator, mapper: Memory(u16, u8)) !*PPU {
@@ -169,8 +170,10 @@ pub const PPU = struct {
         instance.* = .{
             .allocator = allocator,
             .mapper = mapper,
+            .output = try allocator.alloc(u32, 61440),
             .framebuf = try allocator.alloc(u32, 61440),
         };
+        @memset(instance.output, 0);
         @memset(instance.framebuf, 0);
         return instance;
     }
@@ -781,9 +784,8 @@ pub const PPU = struct {
 
             if (self.scanline == self.vblank_line and self.dot == 1) {
                 self.status.vblank = true;
-                if (self.ctrl.nmi) {
-                    self.nmi_requested = true;
-                }
+                if (self.ctrl.nmi) self.nmi_requested = true;
+                @memcpy(self.output, self.framebuf);
             }
 
             if (self.dot > 0 and self.scanline < 240) {
@@ -803,6 +805,8 @@ pub const PPU = struct {
         self.oam_dma = null;
         self.rendering = false;
         self.booting = 0;
+        @memset(self.output, 0);
+        @memset(self.framebuf, 0);
     }
 
     pub fn serialize(self: *const PPU, pack: *c.mpack_writer_t) void {

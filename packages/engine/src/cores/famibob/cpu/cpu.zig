@@ -11,6 +11,8 @@ pub const DMACycle = enum { get, put };
 
 pub const DMAStatus = enum { idle, halting, alignment, dmc_dummy_read, cpu_halted };
 
+pub const IRQType = enum { nmi, rst, irq };
+
 pub const CPU = struct {
     opcode: u8 = 0,
     addressing: opcode.Addressing = .imp,
@@ -45,6 +47,12 @@ pub const CPU = struct {
     nmi_requested: bool = false,
     rst_requested: bool = false,
     irq_requested: bool = false,
+
+    // auxiliary variables for some instructions to hold state between cycles
+    irq_type: IRQType = .rst,
+    irq_cycle: u8 = 0,
+    inst_address: u16 = 0,
+    inst_value: u8 = 0,
 
     memory: Memory(u16, u8),
     dmc: Proxy(u8),
@@ -413,6 +421,10 @@ pub const CPU = struct {
         self.nmi_requested = false;
         self.rst_requested = false;
         self.irq_requested = false;
+        self.irq_type = .rst;
+        self.irq_cycle = 0;
+        self.inst_address = 0;
+        self.inst_value = 0;
     }
 
     pub fn serialize(self: *const CPU, pack: *c.mpack_writer_t) void {
@@ -531,6 +543,14 @@ pub const CPU = struct {
         c.mpack_write_bool(pack, self.rst_requested);
         c.mpack_write_cstr(pack, "irq_requested");
         c.mpack_write_bool(pack, self.irq_requested);
+        c.mpack_write_cstr(pack, "irq_type");
+        c.mpack_write_u8(pack, @intFromEnum(self.irq_type));
+        c.mpack_write_cstr(pack, "irq_cycle");
+        c.mpack_write_u8(pack, self.irq_cycle);
+        c.mpack_write_cstr(pack, "inst_address");
+        c.mpack_write_u16(pack, self.inst_address);
+        c.mpack_write_cstr(pack, "inst_value");
+        c.mpack_write_u8(pack, self.inst_value);
         c.mpack_complete_map(pack);
     }
 
@@ -593,6 +613,10 @@ pub const CPU = struct {
         self.nmi_requested = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "nmi_requested"));
         self.rst_requested = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "rst_requested"));
         self.irq_requested = c.mpack_node_bool(c.mpack_node_map_cstr(pack, "irq_requested"));
+        self.irq_type = @enumFromInt(c.mpack_node_u8(c.mpack_node_map_cstr(pack, "irq_type")));
+        self.irq_cycle = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "irq_cycle"));
+        self.inst_address = c.mpack_node_u16(c.mpack_node_map_cstr(pack, "inst_address"));
+        self.inst_value = c.mpack_node_u8(c.mpack_node_map_cstr(pack, "inst_value"));
     }
 };
 

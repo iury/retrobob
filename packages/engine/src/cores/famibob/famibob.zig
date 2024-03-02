@@ -212,10 +212,6 @@ pub const Famibob = struct {
     pub fn saveState(ctx: *anyopaque, slot: u8) !void {
         const self: *@This() = @ptrCast(@alignCast(ctx));
 
-        while (self.cpu.irq_occurred or self.cpu.next_cycle != .finished) {
-            self.clock.run(.cpu_cycle);
-        }
-
         var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
         defer arena.deinit();
         const allocator = arena.allocator();
@@ -355,12 +351,7 @@ pub const Famibob = struct {
         var self: *@This() = @ptrCast(@alignCast(ctx));
         self.clock.run(.frame);
         self.apu.endFrame();
-
-        if (self.ppu.dot == 339) {
-            self.clock.run(.ppu_cycle);
-        }
-
-        c.UpdateTexture(self.texture.texture, @ptrCast(self.ppu.framebuf));
+        c.UpdateTexture(self.texture.texture, @ptrCast(self.ppu.output));
     }
 
     pub fn core(self: *Self) Core {

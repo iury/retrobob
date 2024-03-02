@@ -70,8 +70,8 @@ pub const Mixer = struct {
 
     pub fn updateRates(self: *Mixer, force: bool) void {
         const clock_rate: u32 = switch (self.region) {
-            .ntsc => 1789773,
-            .pal => 1662607,
+            .ntsc => 1789800,
+            .pal => 1662700,
         };
 
         if (force or self.clock_rate != clock_rate) {

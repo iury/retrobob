@@ -21,8 +21,8 @@ test "Famibob NTSC clock" {
         clock.run(.frame);
     }
 
-    try std.testing.expectApproxEqAbs(29780.3, @as(f64, @floatFromInt(s.cpu)) / 60.0, 0.05);
-    try std.testing.expectApproxEqAbs(89341, @as(f64, @floatFromInt(s.ppu)) / 60.0, 0.05);
+    try std.testing.expectApproxEqAbs(29780.5, @as(f64, @floatFromInt(s.cpu)) / 60.0, 0.05);
+    try std.testing.expectApproxEqAbs(89341.5, @as(f64, @floatFromInt(s.ppu)) / 60.0, 0.05);
 }
 
 test "Famibob PAL clock" {
