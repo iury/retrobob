@@ -1,6 +1,10 @@
-# retrobob
+# Overview
 
-retrobob is a retro gaming emulator that runs directly on your browser.
+**retrobob** is a retro gaming emulator made by [iury](https://github.com/iury) that runs directly on your browser.
+
+NES/Famicom, Gameboy and Gameboy Color are currently supported, with more systems to come.
+
+You can also [download](https://github.com/iury/retrobob/releases) it as a native executable for stable FPS and better audio quality.
 
 Don't have a ROM to test it? Try [Super Tilt Bro](https://sgadrat.itch.io/super-tilt-bro), a free game made by sgadrat.
 
@@ -8,7 +12,7 @@ Don't have a ROM to test it? Try [Super Tilt Bro](https://sgadrat.itch.io/super-
 
 [Live demo](https://retrobob.bitzero.com.br/)
 
-## Building
+## Compiling
 
 You'll need [pnpm](https://pnpm.io/installation), [zig 0.12](https://ziglang.org/download/),
 and [emscripten](https://emscripten.org/docs/getting_started/downloads.html)
@@ -49,7 +53,8 @@ A gamepad (Xbox/PS) or keyboard:
 
 ### GB / GBC
 
-- Only the main mappers are implemented but most commercial games should work.
+- Most commercial games should work.
+- MBCs implemented: ROM, MBC1, MBC2, MBC3 (+RTC) and MBC5.
 - Games in monochrome will use a color palette like playing on a GBC hardware by default but you can toggle it by pressing T.
 
 #### Known Issues
@@ -58,7 +63,8 @@ A gamepad (Xbox/PS) or keyboard:
 
 ### NES / Famicom
 
-- Only the main mappers are implemented but most commercial games should work.
+- Most commercial games should work.
+- Mappers implemented: NROM, CNROM, UxROM, AxROM, MMC1, MMC2 and MMC3.
 
 #### Known Issues
 

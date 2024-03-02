@@ -6,6 +6,8 @@ const Core = @import("cores/core.zig");
 const Famibob = @import("cores/famibob/famibob.zig").Famibob;
 const Gamebob = @import("cores/gamebob/gamebob.zig").Gamebob;
 
+const ICON = @embedFile("assets/icon.png");
+
 pub const ActiveCore = enum(u8) {
     unknown = 0,
     famibob = 1,
@@ -532,6 +534,10 @@ pub fn main() void {
         std.os.emscripten.emscripten_cancel_main_loop();
         std.os.emscripten.emscripten_set_main_loop(fpsLimiter, 0, 1);
     } else {
+        const image = c.LoadImageFromMemory(".png", ICON.ptr, ICON.len);
+        c.SetWindowIcon(image);
+        c.UnloadImage(image);
+
         while (!c.WindowShouldClose()) {
             mainLoop();
         }

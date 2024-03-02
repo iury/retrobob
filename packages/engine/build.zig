@@ -53,6 +53,11 @@ pub fn build(b: *std.Build) !void {
         exe.linkLibrary(pack);
         exe.linkLibrary(ray);
 
+        if (target.result.os.tag == .windows and optimize != .Debug) {
+            exe.addObjectFile(.{ .path = "src/assets/icon.rc.o" });
+            exe.subsystem = .Windows;
+        }
+
         b.installArtifact(exe);
         const run_cmd = b.addRunArtifact(exe);
         run_cmd.step.dependOn(b.getInstallStep());
