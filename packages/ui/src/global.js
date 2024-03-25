@@ -39,7 +39,7 @@ export const Event = {
   END_FRAME: 99,
 }
 
-export const Core = { FAMIBOB: 1, GAMEBOB: 2 }
+export const Core = { FAMIBOB: 1, GAMEBOB: 2, SUPERBOB: 3 }
 export const State = { IDLE: 1, PLAYING: 2, PAUSED: 3 }
 export const Region = { NTSC: 1, PAL: 2 }
 export const Ratio = { NATIVE: 1, NTSC: 2, PAL: 3, STANDARD: 4, WIDESCREEN: 5 }
@@ -78,6 +78,18 @@ export function loadGame(engine, file) {
     reader.readAsArrayBuffer(file)
   } else if (file.name.toLowerCase().endsWith('.gb') || file.name.toLowerCase().endsWith('.gbc')) {
     engine._performAction(Action.LOAD_CORE, Core.GAMEBOB, 0)
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const data = new Uint8Array(reader.result)
+      const m = engine._malloc(data.length)
+      engine.HEAPU8.set(data, m)
+      engine._performAction(Action.LOAD_GAME, data.length, m)
+      engine._free(m)
+    }
+    reader.readAsArrayBuffer(file)
+  } else if (file.name.toLowerCase().endsWith('.sfc') || file.name.toLowerCase().endsWith('.smc')) {
+    engine._performAction(Action.LOAD_CORE, Core.SUPERBOB, 0)
 
     const reader = new FileReader()
     reader.onload = () => {

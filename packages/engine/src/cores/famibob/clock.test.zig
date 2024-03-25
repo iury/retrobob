@@ -15,7 +15,7 @@ test "Famibob NTSC clock" {
     };
 
     var s = S{};
-    var clock = Clock(S, .ntsc){ .handler = &s };
+    var clock = Clock(S){ .handler = &s };
 
     for (0..60) |_| {
         clock.run(.frame);
@@ -38,7 +38,8 @@ test "Famibob PAL clock" {
     };
 
     var s = S{};
-    var clock = Clock(S, .pal){ .handler = &s };
+    var clock = Clock(S){ .handler = &s };
+    clock.setRegion(.pal);
 
     for (0..60) |_| {
         clock.run(.frame);

@@ -8,6 +8,8 @@ ptr: *anyopaque,
 vtable: *const VTable,
 game_width: f32,
 game_height: f32,
+render_width: *f32,
+render_height: *f32,
 state: State = .idle,
 region: Region = .ntsc,
 

@@ -3,7 +3,7 @@ import '@mantine/notifications/styles.css'
 
 import { useCallback, useRef } from 'react'
 import { useAtom, useAtomValue } from 'jotai'
-import { Notifications, notifications } from '@mantine/notifications'
+import { Notifications } from '@mantine/notifications'
 
 import { Engine } from './Engine'
 import { Audio } from './Audio'
@@ -49,7 +49,9 @@ import {
 } from '@tabler/icons-react'
 import { FullscreenButton } from './FullscreenButton'
 
-import { html } from '../../../README.md'
+import { html as readme } from '../../../README.md'
+import { html as changelog } from '../../../CHANGELOG.md'
+import { html as news } from '../../../NEWS.md'
 
 function App() {
   const engineRef = useRef(null)
@@ -227,8 +229,19 @@ function App() {
 
             <TypographyStylesProvider>
               <base target="_blank" />
-              <div dangerouslySetInnerHTML={{ __html: html }} />
+              <div dangerouslySetInnerHTML={{ __html: readme }} />
             </TypographyStylesProvider>
+
+            <TypographyStylesProvider>
+              <base target="_blank" />
+              <div dangerouslySetInnerHTML={{ __html: changelog }} />
+            </TypographyStylesProvider>
+
+            <TypographyStylesProvider>
+              <base target="_blank" />
+              <div dangerouslySetInnerHTML={{ __html: news }} />
+            </TypographyStylesProvider>
+
             <Space />
             <Space />
             <Space />

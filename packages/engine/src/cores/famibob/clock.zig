@@ -4,16 +4,16 @@ const c = @import("../../c.zig");
 
 pub const RunOption = enum { frame, cpu_cycle, ppu_cycle };
 
-pub fn Clock(comptime T: anytype, comptime region: Region) type {
+pub fn Clock(comptime T: anytype) type {
     return struct {
         const Self = @This();
 
         handler: *T,
-        region: Region = region,
+        region: Region = .ntsc,
 
-        frame_cycles: u32 = if (region == .ntsc) 357_366 else 531_960,
-        cpu_divider: u32 = if (region == .ntsc) 12 else 16,
-        ppu_divider: u32 = if (region == .ntsc) 4 else 5,
+        frame_cycles: u32 = 357_366,
+        cpu_divider: u32 = 12,
+        ppu_divider: u32 = 4,
         cpu_counter: u32 = 0,
         ppu_counter: u32 = 0,
 

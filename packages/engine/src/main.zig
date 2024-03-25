@@ -5,6 +5,7 @@ const c = @import("c.zig");
 const Core = @import("cores/core.zig");
 const Famibob = @import("cores/famibob/famibob.zig").Famibob;
 const Gamebob = @import("cores/gamebob/gamebob.zig").Gamebob;
+const Superbob = @import("cores/superbob/superbob.zig").Superbob;
 
 const ICON = @embedFile("assets/icon.png");
 
@@ -12,6 +13,7 @@ pub const ActiveCore = enum(u8) {
     unknown = 0,
     famibob = 1,
     gamebob = 2,
+    superbob = 3,
 };
 
 const Ratio = enum(u8) {
@@ -115,6 +117,40 @@ fn loadROM(data: []const u8) bool {
             c.notifyEvent(.has_battery, if (gamebob.cartridge.battery) 1 else 0);
 
             if (gamebob.cartridge.battery) {
+                const _slot = slot;
+                slot = 0;
+                performAction(.load_state, 0, null);
+                slot = _slot;
+                performAction(.reset_game, 0, null);
+            }
+            return true;
+        },
+        .superbob => {
+            var superbob = Superbob.init(std.heap.c_allocator, data) catch |err| {
+                switch (err) {
+                    error.UnsupportedFile => {
+                        std.debug.print("notify: Unsupported file\n", .{});
+                    },
+                    error.UnsupportedCoprocessor => {
+                        std.debug.print("notify: Unsupported co-processor\n", .{});
+                    },
+                    else => {},
+                }
+                return false;
+            };
+
+            core = superbob.core();
+            resizeScreen();
+
+            c.SetAudioStreamBufferSizeDefault(735);
+            audio_stream = c.LoadAudioStream(44100, 32, 2);
+            c.PlayAudioStream(audio_stream.?);
+
+            c.notifyEvent(.region_support, 1);
+            performAction(.change_region, @intFromEnum(superbob.cartridge.region), 0);
+            c.notifyEvent(.has_battery, if (superbob.cartridge.battery) 1 else 0);
+
+            if (superbob.cartridge.battery) {
                 const _slot = slot;
                 slot = 0;
                 performAction(.load_state, 0, null);
@@ -335,6 +371,16 @@ fn handleFileDropped() void {
         defer alloc.free(buf);
 
         performAction(.load_game, @truncate(buf.len), buf.ptr);
+    } else if (std.mem.endsWith(u8, lower_path, ".sfc") or std.mem.endsWith(u8, lower_path, ".smc")) {
+        performAction(.load_core, @intFromEnum(ActiveCore.superbob), 0);
+
+        const file = std.fs.openFileAbsoluteZ(files.paths[0], .{}) catch return;
+        defer file.close();
+
+        const buf = file.readToEndAlloc(alloc, @truncate(file.getEndPos() catch 0)) catch return;
+        defer alloc.free(buf);
+
+        performAction(.load_game, @truncate(buf.len), buf.ptr);
     } else {
         performAction(.unload_core, 0, null);
         std.debug.print("notify: Unsupported file\n", .{});
@@ -402,11 +448,11 @@ fn updateState() void {
         updateAudioStream();
         c.notifyEvent(.end_frame, 0);
 
-        const overscan: f32 = if (ratio == .ntsc) 8 else 0;
+        const overscan: f32 = if (ratio == .ntsc and cr.render_height.* > 224) @mod(cr.render_height.*, 224.0) / 2.0 else 0;
 
-        const applied_zoom: f32 = @as(f32, @floatFromInt(c.GetScreenHeight())) / @as(f32, @floatFromInt(texture.height));
-        const width: f32 = @floatFromInt(texture.width);
-        const height: f32 = @floatFromInt(texture.height);
+        const applied_zoom: f32 = @as(f32, @floatFromInt(c.GetScreenHeight())) / cr.game_height;
+        const width: f32 = cr.game_width;
+        const height: f32 = cr.game_height;
         var target_width: f32 = @floatFromInt(c.GetScreenWidth());
         const screen_width: f32 = target_width;
 
@@ -420,7 +466,7 @@ fn updateState() void {
             }
         }
 
-        const source: c.Rectangle = .{ .x = 0, .y = overscan, .width = @as(f32, @floatFromInt(texture.width)), .height = @as(f32, @floatFromInt(texture.height)) - overscan * 2 };
+        const source: c.Rectangle = .{ .x = 0, .y = overscan, .width = cr.render_width.*, .height = cr.render_height.* - overscan * 2 };
         const dest: c.Rectangle = .{ .x = (screen_width - target_width) / 2, .y = 0, .width = target_width, .height = @as(f32, @floatFromInt(c.GetScreenHeight())) };
         const origin = .{ .x = 0, .y = 0 };
 
@@ -470,7 +516,7 @@ fn resizeScreen() void {
             c.SetWindowSize(@intFromFloat(width * applied_zoom), @intFromFloat(height * applied_zoom));
         },
         .ntsc => {
-            c.SetWindowSize(@intFromFloat(@trunc(width * 8 / 7) * applied_zoom), @intFromFloat((height - 16) * applied_zoom));
+            c.SetWindowSize(@intFromFloat(@trunc(width * 8 / 7) * applied_zoom), @intFromFloat(@divTrunc(height, 224) * 224 * applied_zoom));
         },
         .pal => {
             c.SetWindowSize(@intFromFloat(@trunc(width * 11 / 8) * applied_zoom), @intFromFloat(height * applied_zoom));

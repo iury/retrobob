@@ -41,9 +41,11 @@ pub const Gamebob = struct {
 
     texture: c.RenderTexture2D = undefined,
     shader: c.Shader = undefined,
+    render_width: f32 = 160,
+    render_height: f32 = 144,
 
     fn initTexture(self: *Self) void {
-        self.texture = c.LoadRenderTexture(@intFromFloat(160), @intFromFloat(144));
+        self.texture = c.LoadRenderTexture(@intFromFloat(self.render_width), @intFromFloat(self.render_height));
         self.shader = c.LoadShaderFromMemory(0, FRAG);
     }
 
@@ -403,8 +405,10 @@ pub const Gamebob = struct {
     pub fn core(self: *Self) Core {
         return .{
             .ptr = self,
-            .game_width = 160,
-            .game_height = 144,
+            .game_width = self.render_width,
+            .game_height = self.render_height,
+            .render_width = &self.render_width,
+            .render_height = &self.render_height,
             .state = .paused,
             .vtable = &.{
                 .render = render,
